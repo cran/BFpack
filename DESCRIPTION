@@ -1,8 +1,8 @@
 Package: BFpack
 Type: Package
 Title: Flexible Bayes Factor Testing of Scientific Expectations
-Version: 0.2.1
-Date: 2020-05-11
+Version: 0.3.1
+Date: 2020-11-29
 Authors@R: 
     c(person(given = c("Joris"),
              family = "Mulder",
@@ -12,6 +12,10 @@ Authors@R:
              family = "van Lissa",
              role = c("aut", "ctb"),
              email = "c.j.vanlissa@uu.nl"),
+      person(given = "Donald R.",
+             family = "Williams",
+             role = c("aut", "ctb"),
+             email = "drwwilliams@ucdavis.edu"),
       person(given = "Xin",
              family = "Gu",
              role = "aut",
@@ -24,10 +28,6 @@ Authors@R:
              family = "Boeing-Messing",
              role = c("aut", "ctb"),
              email = "F.Boeing-Messing@uvt.nl"),
-      person(given = "Donald R.",
-             family = "Williams",
-             role = c("aut", "ctb"),
-             email = "drwwilliams@ucdavis.edu"),
       person(given = "Jean-Paul",
              family = "Fox",
              role = c("aut", "ctb"),
@@ -36,6 +36,10 @@ Authors@R:
              family = "Menke",
              role = c("ctb"),
              email = "janosch.menke@uni-muenster.de"),
+      person(given = "Robbie",
+             family = "van Aert",
+             role = c("ctb"),
+             email = "R.C.M.vanAert@tilburguniversity.edu"),
       person(given = "Barry",
              family = "Brown",
              role = "ctb"),
@@ -108,19 +112,21 @@ BugReports: https://github.com/jomulder/BFpack/issues
 Encoding: UTF-8
 LazyData: true
 NeedsCompilation: yes
-RoxygenNote: 6.1.1
+RoxygenNote: 7.1.1
 Depends: R (>= 3.0.0), bain
-Imports: stats, MASS, Matrix, mvtnorm, pracma, lme4
-Suggests: testthat, polycor, survival, pscl
-Packaged: 2020-05-11 16:04:12 UTC; jorismulder
+Imports: stats, MASS, Matrix, mvtnorm, pracma, lme4, extraDistr
+Suggests: testthat, polycor, survival, pscl, metafor, knitr, rmarkdown
+VignetteBuilder: knitr
+Packaged: 2020-11-30 12:31:12 UTC; jorismulder
 Author: Joris Mulder [aut, cre],
   Caspar van Lissa [aut, ctb],
+  Donald R. Williams [aut, ctb],
   Xin Gu [aut],
   Anton Olsson-Collentine [aut, ctb],
   Florian Boeing-Messing [aut, ctb],
-  Donald R. Williams [aut, ctb],
   Jean-Paul Fox [aut, ctb],
   Janosch Menke [ctb],
+  Robbie van Aert [ctb],
   Barry Brown [ctb],
   James Lovato [ctb],
   Kathy Russell [ctb],
@@ -136,4 +142,4 @@ Author: Joris Mulder [aut, cre],
   Jean-Pierre Moreau [ctb],
   The R Core Team [cph]
 Repository: CRAN
-Date/Publication: 2020-05-11 17:50:02 UTC
+Date/Publication: 2020-11-30 15:30:02 UTC

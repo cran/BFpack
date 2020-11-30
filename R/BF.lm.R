@@ -48,7 +48,7 @@ BF.lm <- function(x,
     # dummyX indicate which columns contain dummy group covariates
     dummyX1 <- apply(matrix(unlist(lapply(1:length(mains),function(faclev){
       unlist(lapply(1:length(names_coef),function(cf){
-        grepl(mains[faclev],names_coef[cf])
+        grepl(mains[faclev],names_coef[cf],fixed=TRUE)
       }))
     })),nrow=length(names_coef)),1,max)==1
     if(is.matrix(apply(Xmat,2,table))){
@@ -124,8 +124,8 @@ BF.lm <- function(x,
   if(P==1){
     names_coef <- row.names(x$coefficients)
   }else{
-    names_coef1 <- names(x$coefficients[,1])
-    names_coef2 <- names(x$coefficients[1,])
+    names_coef1 <- row.names(x$coefficients)
+    names_coef2 <- colnames(x$coefficients)
     names_coef <- unlist(lapply(1:P,function(p){
       lapply(1:K,function(k){
         paste0(names_coef1[k],"_on_",names_coef2[p])
@@ -178,7 +178,7 @@ BF.lm <- function(x,
 
   # Additional exploratory tests of main effects and interaction effects
   # in the case of an aov type object
-  if(sum(class(x)=="aov")==1){
+  if(sum(class(x)=="aov")==1 & J > 1){
     testedparameter <- "group means"
 
     # check main effects
@@ -212,7 +212,8 @@ BF.lm <- function(x,
     #compute Bayes factors for testing main effects if present
     if(length(BFmain)>0){ # then there are main effects
       names_main <- names(BFmain[(0:(length(BFmain)/3-1))*3+1])
-      BFtu_main <- matrix(c(BFmain[(0:(length(BFmain)/3-1))*3+1],rep(1,length(BFmain)/3)),nrow=length(BFmain)/3)
+      BFtu_main <- matrix(c(BFmain[(0:(length(BFmain)/3-1))*3+1],rep(1,length(BFmain)/3)),
+                          nrow=length(BFmain)/3)
       row.names(BFtu_main) <- names_main
       colnames(BFtu_main) <- c("BFtu","BFuu")
       PHP_main <- BFtu_main / apply(BFtu_main,1,sum)
@@ -274,12 +275,12 @@ BF.lm <- function(x,
       PHP_interaction <- BFtu_interaction / apply(BFtu_interaction,1,sum)
       colnames(PHP_interaction) <- c("Pr(H0)","Pr(H1)")
     }else{ PHP_interaction <- BFtu_interaction <- NULL}
-  }else{ PHP_interaction <- BFtu_interaction <- PHP_main <- BFtu_main <- NULL}
+    BFtu_exploratory <- rbind(BFtu_main,BFtu_interaction)
+    PHP_exploratory <- rbind(PHP_main,PHP_interaction)
+  }
 
   # confirmatory BF test
   if(!is.null(hypothesis)){
-
-    # hypotheses are either formulated on regression coefficients
 
     #then constraints on regression coefficients
     matrixnames <- matrix(names_coef,nrow=K)
@@ -527,10 +528,6 @@ BF.lm <- function(x,
     PHP_confirmatory=PHP_confirmatory,
     BFmatrix_confirmatory=BFmatrix_confirmatory,
     BFtable_confirmatory=BFtable,
-    BFtu_main=BFtu_main,
-    PHP_main=PHP_main,
-    BFtu_interaction=PHP_interaction,
-    PHP_interaction=PHP_interaction,
     prior=priorprobs,
     hypotheses=hypotheses,
     estimates=postestimates,
@@ -584,12 +581,13 @@ MatrixStudent_measures <- function(Mean1,Scale1,tXXi1,df1,RrE1,RrO1,Names1=NULL,
       if(rankMatrix(RO1)[[1]]==nrow(RO1)){ #RO1 is of full row rank. So use transformation.
 
         Scale1inv <- solve(Scale1)
-        relO <- mean(unlist(lapply(1:1e3,function(s){
+        relO <- unlist(lapply(1:1e3,function(s){
           Sigma1 <- solve(rWishart(1,df=df1+P-1,Sigma=Scale1inv)[,,1])
           meanO <- c(RO1%*%mean1)
           covmO <- RO1%*%kronecker(Sigma1,tXXi1)%*%t(RO1)
-          pmvnorm(lower=rO1,upper=Inf,mean=meanO,sigma=covmO)
-        })))
+          pmvnorm(lower=rO1,upper=Inf,mean=meanO,sigma=covmO)[1]
+        }))
+        relO <- mean(relO[relO!="NaN"])
 
       }else{ #no linear transformation can be used; pmvt cannot be used. Use bain with a multivariate normal approximation
         #compute covariance matrix for multivariate normal distribution
@@ -652,12 +650,12 @@ MatrixStudent_measures <- function(Mean1,Scale1,tXXi1,df1,RrE1,RrO1,Names1=NULL,
                              matrix(temp[1:qE1,(qE1+1):qC1],nrow=qE1))
         #check covariance because some can be nonsymmetric due to a generation error
         welk1 <- which(unlist(lapply(covm1_OE,function(temp) isSymmetric(temp,
-                                                                         tol = sqrt(.Machine$double.eps),check.attributes = FALSE) &&
+                                       tol = sqrt(.Machine$double.eps),check.attributes = FALSE) &&
                                        min(eigen(temp)$values)>sqrt(.Machine$double.eps) )))
         covm1_OE <- covm1_OE[welk1]
         mean1_OE <- mean1_OE[welk1]
         relO <- mean(mapply(function(mu_temp,Sigma_temp) pmvnorm(lower=rO1,
-                                                                 upper=rep(Inf,qO1),mean=mu_temp,sigma=Sigma_temp)[1],mean1_OE,covm1_OE))
+                 upper=rep(Inf,qO1),mean=mu_temp,sigma=Sigma_temp)[1],mean1_OE,covm1_OE))
       }else{ #use bain for the computation of the probability
 
         mean1 <- c(Mean1)

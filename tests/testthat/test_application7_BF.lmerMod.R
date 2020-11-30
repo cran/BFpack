@@ -12,14 +12,29 @@ BFicc <- BF(outlme1,hypothesis=
 #check results confirmatory test
 test_that("lmerMod two hypotheses correctly evaluated", {
   expect_equivalent(
-    round(BFicc$PHP_confirmatory,7),c(0.58,0.36,0.06), tolerance = .05
+    round(BFicc$PHP_confirmatory,7),c(0.73,0.24,0.04), tolerance = .05
 )})
 #check results exploratory test
-matrixPHP <- matrix(c(0.667, 0.254, 0.068,
+matrixPHP <- matrix(c(0.678, 0.254, 0.068,
                       0.000, 0.000, 1.000),nrow=2,byrow=T)
 test_that("lmerMod explortatory hypotheses correctly evaluated", {
   expect_equivalent(
     BFicc$PHP_exploratory,matrixPHP,tolerance = .05
 )})
+
+
+#this is a smaller subset of the data with unbalanced groups
+timssICC_subset <- timssICC[timssICC$groupNL11==1,][c(1:15,15+1:12,30+1:8,45+1:4,60+1:9),]
+outlme2 <- lme4::lmer(math ~ -1 + gender +
+                        (0+groupNL11 | schoolID),
+                      data=timssICC_subset)
+set.seed(123)
+BFicc2 <- BF(outlme2)
+#check results exploratory test
+test_that("lmerMod exploratory unbalanced", {
+  expect_equivalent(
+    round(BFicc2$BFtu_exploratory,3),c(0,0,1.07), tolerance = .05
+  )})
+
 
 
