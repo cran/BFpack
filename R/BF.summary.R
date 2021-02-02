@@ -11,7 +11,7 @@ summary.BF <- function(object, ...){
   digits <- 3
 
   cat("Bayesian hypothesis test","\n", sep = "")
-  cat("Type: Exploratory","\n", sep = "")
+  cat("Type: exploratory","\n", sep = "")
   cat("Object: ",class(object$model)[1],"\n", sep = "")
   cat("Parameter: ",object$parameter,"\n", sep = "")
   cat("Method: ",object$bayesfactor,"\n\n", sep = "")
@@ -24,7 +24,7 @@ summary.BF <- function(object, ...){
   if(!is.null(object$BFtu_confirmatory)){
 
     cat("Bayesian hypothesis test","\n", sep = "")
-    cat("Type: Confirmatory","\n", sep = "")
+    cat("Type: confirmatory","\n", sep = "")
     cat("Object: ",class(object$model)[1],"\n", sep = "")
     cat("Parameter: ",object$parameter,"\n", sep = "")
     cat("Method: ",object$bayesfactor,"\n\n", sep = "")
@@ -41,7 +41,7 @@ summary.BF <- function(object, ...){
     print(PHPmatrix)
 
     cat("\n")
-    cat("Evidence matrix:")
+    cat("Evidence matrix (Bayes factors):")
     cat("\n")
 
     BFmat <- round(object$BFmatrix_confirmatory,digits)

@@ -1,8 +1,8 @@
 Package: BFpack
 Type: Package
 Title: Flexible Bayes Factor Testing of Scientific Expectations
-Version: 0.3.1
-Date: 2020-11-29
+Version: 0.3.2
+Date: 2021-02-01
 Authors@R: 
     c(person(given = c("Joris"),
              family = "Mulder",
@@ -91,9 +91,9 @@ Description: Implementation of various default Bayes factors
     generalized linear models, special cases of 
     linear mixed models, survival models, relational
     event models. Parameters that can be tested are
-    location parameters (e.g., regression coefficients),
+    location parameters (e.g., group means, regression coefficients),
     variances (e.g., group variances), and measures of 
-    association (e.g,. bivariate correlations).
+    association (e.g,. bivariate correlations), among others.
     The statistical underpinnings are
     described in 
     Mulder, Hoijtink, and Xin (2019) <arXiv:1904.00679>,
@@ -117,7 +117,7 @@ Depends: R (>= 3.0.0), bain
 Imports: stats, MASS, Matrix, mvtnorm, pracma, lme4, extraDistr
 Suggests: testthat, polycor, survival, pscl, metafor, knitr, rmarkdown
 VignetteBuilder: knitr
-Packaged: 2020-11-30 12:31:12 UTC; jorismulder
+Packaged: 2021-02-01 20:05:26 UTC; jorismulder
 Author: Joris Mulder [aut, cre],
   Caspar van Lissa [aut, ctb],
   Donald R. Williams [aut, ctb],
@@ -142,4 +142,4 @@ Author: Joris Mulder [aut, cre],
   Jean-Pierre Moreau [ctb],
   The R Core Team [cph]
 Repository: CRAN
-Date/Publication: 2020-11-30 15:30:02 UTC
+Date/Publication: 2021-02-02 10:20:21 UTC

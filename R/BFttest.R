@@ -6,7 +6,7 @@
 BF.htest <-
   function(x,
            hypothesis = NULL,
-           prior = NULL,
+           prior.hyp = NULL,
            ...) {
     stop("Please use the function t_test() from the 'bain' package for a t-test or bartlett_test() from the 'BFpack' package for a test on group variances.")
   }
@@ -18,7 +18,7 @@ BF.htest <-
 #' @export
 BF.t_test <- function(x,
                       hypothesis = NULL,
-                      prior = NULL,
+                      prior.hyp = NULL,
                       complement = TRUE,
                       ...){
 
@@ -39,15 +39,26 @@ BF.t_test <- function(x,
     relcomp1 <- relcomp2 <- log(.5)
 
     #exploratory BFs
-    hypotheses_exploratory <- c(paste0("mu=",as.character(mu0)),paste0("mu<",as.character(mu0)),paste0("mu>",as.character(mu0)))
+    if(x$method=="Paired t-test"){
+      hypotheses_exploratory <- c(paste0("difference=",as.character(mu0)),paste0("difference<",as.character(mu0)),
+                                  paste0("difference>",as.character(mu0)))
+    }else{
+      hypotheses_exploratory <- c(paste0("mu=",as.character(mu0)),paste0("mu<",as.character(mu0)),paste0("mu>",as.character(mu0)))
+    }
     logBFtu <- c(relfit0-relcomp0,relfit1-relcomp1,relfit2-relcomp2)
     names(logBFtu) <- hypotheses_exploratory
     BFtu_exploratory <- matrix(exp(logBFtu),nrow=1)
     colnames(BFtu_exploratory) <- hypotheses_exploratory
     row.names(BFtu_exploratory) <- "BFtu"
     PHP_exploratory <- BFtu_exploratory/sum(BFtu_exploratory)
-    colnames(PHP_exploratory) <- c(paste0("Pr(=",as.character(mu0),")"),paste0("Pr(<",as.character(mu0),")"),paste0("Pr(>",as.character(mu0),")"))
-    row.names(PHP_exploratory) <- "mu"
+    colnames(PHP_exploratory) <- c(paste0("Pr(=",as.character(mu0),")"),paste0("Pr(<",as.character(mu0),")"),
+                                   paste0("Pr(>",as.character(mu0),")"))
+    if(x$method=="Paired t-test"){
+      row.names(PHP_exploratory) <- "difference"
+    }else{
+      row.names(PHP_exploratory) <- "mu"
+    }
+
     relfit_exploratory <- matrix(c(exp(relfit0),rep(1,3),exp(relfit1),exp(relfit2)),ncol=2)
     relcomp_exploratory <- matrix(c(exp(relcomp0),rep(1,3),rep(.5,2)),ncol=2)
     row.names(relfit_exploratory) <- row.names(relcomp_exploratory) <- hypotheses_exploratory
@@ -61,8 +72,12 @@ BF.t_test <- function(x,
       y1 <- y1 - mean(y1)
       y1 <- sd1*y1/sd(y1) + xbar
       lm1 <- lm(y1 ~ 1)
-      names(lm1$coefficients) <- "mu"
-      BFlm1 <- BF(lm1,hypothesis,prior=prior,complement=complement)
+      if(x$method=="Paired t-test"){
+        names(lm1$coefficients) <- "difference"
+      }else{
+        names(lm1$coefficients) <- "mu"
+      }
+      BFlm1 <- BF(lm1,hypothesis,prior.hyp=prior.hyp,complement=complement)
       BFtu_confirmatory <- BFlm1$BFtu_confirmatory
       PHP_confirmatory <- BFlm1$PHP_confirmatory
       BFmatrix_confirmatory <- BFlm1$BFmatrix_confirmatory
@@ -70,7 +85,11 @@ BF.t_test <- function(x,
       hypotheses <- row.names(BFtable)
       priorprobs <- BFlm1$prior
     }
-
+    if(x$method=="Paired t-test"){
+      parameter <- "difference in means"
+    }else{
+      parameter <- "mean"
+    }
   }else{ # two samples t test
 
     if(!grepl("Welch",x$method)){ # equal variances assumed
@@ -82,16 +101,20 @@ BF.t_test <- function(x,
       out1 <- (draw1 - mean(draw1))/sd(draw1)*sqrt(x$v[1])+x$estimate[1]
       draw2 <- rnorm(x$n[2])
       out2 <- (draw2 - mean(draw2))/sd(draw2)*sqrt(x$v[2])+x$estimate[2]
-      out <- c(out1,out2)
-      # lm1 <- lm(out ~ -1 + x1 + y1)
-      T1 <- matrix(c(1,1,-1,0),ncol=2)
-      transx1y1 <- matx1y1%*%solve(T1)
-      df1 <- data.frame(out=out,difference=transx1y1[,1],dummy=transx1y1[,2])
-      lm1 <- lm(out ~ -1 + difference + dummy,df1)
-      BFlm1 <- BF(lm1,hypothesis=hypothesis,prior=prior,complement=complement)
+      out <- c(out2,out1)
+      # perform the test via a lm object using a factor for the group indicator
+      # such that the name of the key variable (the difference between the means)
+      # is called 'difference'
+      df1 <- data.frame(out=out,differenc=factor(c(rep("a",x$n[2]),rep("e",x$n[1]))))
+      lm1 <- lm(out ~ differenc,df1)
+      BFlm1 <- BF(lm1,hypothesis=hypothesis,prior.hyp=prior.hyp,complement=complement)
 
-      BFtu_exploratory <- t(as.matrix(BFlm1$BFtu_exploratory[1,]))
-      PHP_exploratory <- t(as.matrix(BFlm1$PHP_exploratory[1,]))
+      #
+      # CHECK IF IF IT x - y OR y - x. error in 2-sample test.
+      #
+
+      BFtu_exploratory <- t(as.matrix(BFlm1$BFtu_exploratory[2,]))
+      PHP_exploratory <- t(as.matrix(BFlm1$PHP_exploratory[2,]))
       row.names(BFtu_exploratory) <- row.names(PHP_exploratory) <- "difference"
 #
       if(!is.null(hypothesis)){
@@ -185,14 +208,14 @@ BF.t_test <- function(x,
         relfit <- exp(relfit)
         relcomp <- exp(relcomp)
         # Check input of prior probabilies
-        if(is.null(prior)){
+        if(is.null(prior.hyp)){
           priorprobs <- rep(1/nrow(relcomp),nrow(relcomp))
         }else{
-          if(!is.numeric(prior) || length(prior)!=nrow(relcomp)){
-            warning(paste0("Argument 'prior' should be numeric and of length ",as.character(nrow(relcomp)),". Equal prior probabilities are used."))
+          if(!is.numeric(prior.hyp) || length(prior.hyp)!=nrow(relcomp)){
+            warning(paste0("Argument 'prior.hyp' should be numeric and of length ",as.character(nrow(relcomp)),". Equal prior probabilities are used."))
             priorprobs <- rep(1/nrow(relcomp),nrow(relcomp))
           }else{
-            priorprobs <- prior
+            priorprobs <- prior.hyp
           }
         }
         #compute Bayes factors and posterior probabilities for confirmatory test
@@ -212,6 +235,7 @@ BF.t_test <- function(x,
         hypotheses <- row.names(relative_complexity)
       }
     }
+    parameter <- "difference in means"
   }
 
   if(is.null(hypothesis)){
@@ -226,12 +250,12 @@ BF.t_test <- function(x,
     PHP_confirmatory=PHP_confirmatory,
     BFmatrix_confirmatory=BFmatrix_confirmatory,
     BFtable_confirmatory=BFtable,
-    prior=priorprobs,
+    prior.hyp=priorprobs,
     hypotheses=hypotheses,
     estimates=x$coefficients,
     model=x,
-    bayesfactor="generalized adjusted fractional Bayes factor",
-    parameter="means",
+    bayesfactor="generalized adjusted fractional Bayes factors",
+    parameter=parameter,
     call=match.call())
 
   class(BFlm_out) <- "BF"

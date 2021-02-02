@@ -7,7 +7,7 @@
 #' @export
 BF.lm <- function(x,
                   hypothesis = NULL,
-                  prior = NULL,
+                  prior.hyp = NULL,
                   complement = TRUE,
                   ...){
 
@@ -22,7 +22,7 @@ BF.lm <- function(x,
   dummyX <- rep(F,K)
   names(dummyX) <- row.names(x$coefficients)
 
-  bayesfactor <- "generalized adjusted fractional Bayes factor for coefficients"
+  bayesfactor <- "generalized adjusted fractional Bayes factors"
   testedparameter <- "regression coefficients"
 
   Xmat <- model.matrix(x)
@@ -36,31 +36,39 @@ BF.lm <- function(x,
     dvec <- rep(1,Nj)
     #set minimal fractions for the group
     bj <- ((P+K)/J)/Nj
+    #no dummy covariates for factors
+    dummy01TRUE <- FALSE
   }else{
-    numlevels <- unlist(lapply(x$xlevels,length))
-    mains <- unlist(lapply(1:length(x$xlevels),function(fac){
-      unlist(lapply(1:length(x$xlevels[[fac]]),function(lev){
-        paste0(names(x$xlevels)[fac],x$xlevels[[fac]][lev])
+    #check if the dummy group variables have 0 / 1 coding
+    dummy01TRUE <- prod(unlist(lapply(1:length(x$contrasts),function(fac){
+      x$contrasts[[fac]] == "contr.treatment"
+    }))) == 1
+    if(dummy01TRUE){
+      numlevels <- unlist(lapply(x$xlevels,length))
+      mains <- unlist(lapply(1:length(x$xlevels),function(fac){
+        unlist(lapply(1:length(x$xlevels[[fac]]),function(lev){
+          paste0(names(x$xlevels)[fac],x$xlevels[[fac]][lev])
+        }))
       }))
-    }))
-    intercept <- attr(x$terms,"intercept")==1
-    names_coef <- row.names(x$coefficients)
-    # dummyX indicate which columns contain dummy group covariates
-    dummyX1 <- apply(matrix(unlist(lapply(1:length(mains),function(faclev){
-      unlist(lapply(1:length(names_coef),function(cf){
-        grepl(mains[faclev],names_coef[cf],fixed=TRUE)
-      }))
-    })),nrow=length(names_coef)),1,max)==1
-    if(is.matrix(apply(Xmat,2,table))){
-      if(nrow(apply(Xmat,2,table))){
-        dummyX2 <- rep(T,ncol(Xmat))
-      }else{
-        dummyX2 <- rep(F,ncol(Xmat))
-      }
+      intercept <- attr(x$terms,"intercept")==1
+      names_coef <- row.names(x$coefficients)
+      # dummyX1 checks which columns of the design matrix X are dummy's for a
+      # main effect or interaction effect
+      dummyX1 <- apply(matrix(unlist(lapply(1:length(mains),function(faclev){
+        unlist(lapply(1:length(names_coef),function(cf){
+          grepl(mains[faclev],names_coef[cf],fixed=TRUE)
+        }))
+      })),nrow=length(names_coef)),1,max)==1
     }else{
-      dummyX2 <- unlist(lapply(apply(Xmat,2,table),length))==2
+      dummyX1 <- rep(TRUE,K)
     }
-    dummyX <- dummyX1 * dummyX2 == 1
+    # dummyX2 checks which columns of the design matrix have two possible outcomes,
+    # which indicates a dummy variable
+    dummyX2 <- unlist(lapply(1:K,function(k){
+      length(table(Xmat[,k])) == 2
+    }))
+    # dummyX indicate which columns contain dummy group covariates
+    dummyX <- dummyX2 * dummyX1 == 1
     #number of groups on variations of dummy combinations
     groupcode <- as.matrix(unique(Xmat[,dummyX]))
     rownames(groupcode) <- unlist(lapply(1:nrow(groupcode),function(r){
@@ -78,6 +86,12 @@ BF.lm <- function(x,
     Nj <- c(table(dvec))
     #set minimal fractions for each group
     bj <- ((P+K)/J)/Nj
+    if(max(bj)>1){#then too few observations in certain groups, then use one single minimal fraction
+      bj <- rep((P+K)/sum(Nj),length=J)
+      if(bj[1]>1){
+        stop("Not enough observations to compute a fractional Bayes factor.")
+      }
+    }
   }
 
   #Compute sufficient statistics for all groups
@@ -91,14 +105,17 @@ BF.lm <- function(x,
   })
   tXYj <- lapply(1:J,function(j){
     if(Nj[j]==1){
-      as.matrix(Xmat[dvec==j,]*Ymat[dvec==j,])
+      as.matrix(Xmat[dvec==j,])%*%t(Ymat[dvec==j,])
     } else {t(Xmat[dvec==j,])%*%Ymat[dvec==j,]}
   })
   tXYj_b <- lapply(1:J,function(j){
     tXYj[[j]]*bj[j]
   })
   tYYj <- lapply(1:J,function(j){
-    t(Ymat[dvec==j,])%*%Ymat[dvec==j,]
+    if(Nj[j]==1){
+      Ymat[dvec==j,]%*%t(Ymat[dvec==j,])
+    }else t(Ymat[dvec==j,])%*%Ymat[dvec==j,]
+
   })
   tYYj_b <- lapply(1:J,function(j){
     tYYj[[j]]*bj[j]
@@ -178,8 +195,8 @@ BF.lm <- function(x,
 
   # Additional exploratory tests of main effects and interaction effects
   # in the case of an aov type object
-  if(sum(class(x)=="aov")==1 & J > 1){
-    testedparameter <- "group means"
+  if(sum(class(x)=="aov")==1 & J > 1 & dummy01TRUE){
+     testedparameter <- "group means"
 
     # check main effects
     BFmain <- unlist(lapply(1:length(numlevels),function(fac){
@@ -217,7 +234,7 @@ BF.lm <- function(x,
       row.names(BFtu_main) <- names_main
       colnames(BFtu_main) <- c("BFtu","BFuu")
       PHP_main <- BFtu_main / apply(BFtu_main,1,sum)
-      colnames(PHP_main) <- c("Pr(H0)","Pr(H1)")
+      colnames(PHP_main) <- c("Pr(no effect)","Pr(complement)")
     }else{ PHP_main <- BFtu_main <- NULL}
     #check whether interaction effects are present
     prednames <- names(attr(x$term,"dataClasses"))
@@ -273,7 +290,7 @@ BF.lm <- function(x,
       row.names(BFtu_interaction) <- names_interaction
       colnames(BFtu_interaction) <- c("BFtu","BFuu")
       PHP_interaction <- BFtu_interaction / apply(BFtu_interaction,1,sum)
-      colnames(PHP_interaction) <- c("Pr(H0)","Pr(H1)")
+      colnames(PHP_interaction) <- c("Pr(no effect)","Pr(complement)")
     }else{ PHP_interaction <- BFtu_interaction <- NULL}
     BFtu_exploratory <- rbind(BFtu_main,BFtu_interaction)
     PHP_exploratory <- rbind(PHP_main,PHP_interaction)
@@ -430,14 +447,14 @@ BF.lm <- function(x,
       # the BF for the complement hypothesis vs Hu needs to be computed.
       BFtu_confirmatory <- c(apply(relfit / relcomp, 1, prod))
       # Check input of prior probabilies
-      if(is.null(prior)){
+      if(is.null(prior.hyp)){
         priorprobs <- rep(1/length(BFtu_confirmatory),length(BFtu_confirmatory))
       }else{
-        if(!is.numeric(prior) || length(prior)!=length(BFtu_confirmatory)){
-          warning(paste0("Argument 'prior' should be numeric and of length ",as.character(length(BFtu_confirmatory)),". Equal prior probabilities are used."))
+        if(!is.numeric(prior.hyp) || length(prior.hyp)!=length(BFtu_confirmatory)){
+          warning(paste0("Argument 'prior.hyp' should be numeric and of length ",as.character(length(BFtu_confirmatory)),". Equal prior probabilities are used."))
           priorprobs <- rep(1/length(BFtu_confirmatory),length(BFtu_confirmatory))
         }else{
-          priorprobs <- prior
+          priorprobs <- prior.hyp
         }
       }
 
@@ -493,14 +510,14 @@ BF.lm <- function(x,
       # the BF for the complement hypothesis vs Hu needs to be computed.
       BFtu_confirmatory <- c(apply(relfit / relcomp, 1, prod))
       # Check input of prior probabilies
-      if(is.null(prior)){
+      if(is.null(prior.hyp)){
         priorprobs <- rep(1/length(BFtu_confirmatory),length(BFtu_confirmatory))
       }else{
-        if(!is.numeric(prior) || length(prior)!=length(BFtu_confirmatory)){
-          warning(paste0("Argument 'prior' should be numeric and of length ",as.character(length(BFtu_confirmatory)),". Equal prior probabilities are used."))
+        if(!is.numeric(prior.hyp) || length(prior.hyp)!=length(BFtu_confirmatory)){
+          warning(paste0("Argument 'prior.hyp' should be numeric and of length ",as.character(length(BFtu_confirmatory)),". Equal prior probabilities are used."))
           priorprobs <- rep(1/length(BFtu_confirmatory),length(BFtu_confirmatory))
         }else{
-          priorprobs <- prior
+          priorprobs <- prior.hyp
         }
       }
       names(priorprobs) <- names(BFtu_confirmatory)

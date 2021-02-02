@@ -12,7 +12,7 @@
 
 <meta name="author" content="Mulder, J., Williams, D. R., Gu, X., Tomarken, A., Boeing-Messing, F., Olsson-Collentine, A., Meijerink, M., Menke, J., van Aert, R., Fox, J.-P., Hoijtink, H., Rosseel, Y., Wagenmakers, E.-J., and van Lissa, C." />
 
-<meta name="date" content="2020-11-30" />
+<meta name="date" content="2021-02-01" />
 
 <title>Introduction to BFpack</title>
 
@@ -367,13 +367,13 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <h1 class="title toc-ignore">Introduction to <strong><em>BFpack</em></strong></h1>
 <h4 class="author">Mulder, J., Williams, D. R., Gu, X., Tomarken, A., Boeing-Messing, F., Olsson-Collentine, A., Meijerink, M., Menke, J., van Aert, R., Fox, J.-P., Hoijtink, H., Rosseel, Y., Wagenmakers, E.-J., and van Lissa, C.</h4>
-<h4 class="date">2020-11-30</h4>
+<h4 class="date">2021-02-01</h4>
 
 
 
 <div id="introduction" class="section level2">
 <h2>Introduction</h2>
-<p><code>BFpack</code> contains a collection of functions for Bayesian hypothesis testing using Bayes factors and posterior probabilities in R. The main function <code>BF</code> needs a fitted model <code>x</code> as input argument. Depending on the class of the fitted model, a standard hypothesis test is executed by default. For example, if <code>x</code> is a fitted regression model of class <code>lm</code> then posterior probabilities are computed of whether each separate coefficient is zero, negative, or positive (assuming equal prior probabilities). If one has specific hypotheses with equality and/or order constraints on the parameters under the fitted model <code>x</code> then these can be formulated using the <code>hypothesis</code> argument (a character string), possibly together prior probabilities for the hypotheses via the <code>prior</code> argument (default all hypotheses are equally likely a priori), and the <code>complement</code> argument which is a logical stating whether the complement hypotheses should be included in the case (<code>TRUE</code> by default).</p>
+<p><code>BFpack</code> contains a collection of functions for Bayesian hypothesis testing using Bayes factors and posterior probabilities in R. The main function <code>BF</code> needs a fitted model <code>x</code> as input argument. Depending on the class of the fitted model, a standard hypothesis test is executed by default. For example, if <code>x</code> is a fitted regression model of class <code>lm</code> then posterior probabilities are computed of whether each separate coefficient is zero, negative, or positive (assuming equal prior probabilities). If one has specific hypotheses with equality and/or order constraints on the parameters under the fitted model <code>x</code> then these can be formulated using the <code>hypothesis</code> argument (a character string), possibly together prior probabilities for the hypotheses via the <code>prior.hyp</code> argument (default all hypotheses are equally likely a priori), and the <code>complement</code> argument which is a logical stating whether the complement hypotheses should be included in the case (<code>TRUE</code> by default).</p>
 <p>Alternatively, when the model of interest is not of a class that is currently supported, <code>x</code> can also be a named numeric vector containing the estimates of the model parameters of interest, together with the error covariance matrix in the argument <code>Sigma</code>, and the sample size used to obtain the estimates, to perform an approximate Bayes factor test using large sample theory.</p>
 </div>
 <div id="reference" class="section level2">
@@ -384,7 +384,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 </div>
 <div id="usage" class="section level2">
 <h2>Usage</h2>
-<p><code>BF(x, hypothesis, prior = NULL, complement = TRUE, ...)</code></p>
+<p><code>BF(x, hypothesis, prior.hyp = NULL, complement = TRUE, ...)</code></p>
 </div>
 <div id="arguments" class="section level2">
 <h2>Arguments</h2>
@@ -402,8 +402,9 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <li><code>coxph</code> for survival analysis,</li>
 <li><code>survreg</code> for survival analysis,</li>
 <li><code>polr</code> for ordinal regression,</li>
-<li><code>zeroinfl</code> for zero-inflated regression</li>
-<li><code>rma</code> for meta-analysis.</li>
+<li><code>zeroinfl</code> for zero-inflated regression,</li>
+<li><code>rma</code> for meta-analysis,</li>
+<li><code>x</code> can also be a named vector with estimates of the key parameters.</li>
 </ul></li>
 <li><code>hypothesis</code>, a character string specifying the hypotheses with equality and/or order constraints on the key parameters of interest.
 <ul>
@@ -411,7 +412,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <li>The parameter names are based on the names of the estimated key parameters. An overview of the key parameters is given using the function <code>get_estimates</code>, e.g., <code>get_estimates(model1),</code> where <code>model1</code> is a fitted model object.</li>
 <li>Separate constraints within a hypothesis are separated with an ampersand <code>&amp;</code>. Hypotheses are separated using a semi-colon <code>;</code>. For example <code>hypothesis = &quot;weight &gt; height &amp; height &gt; 0; weight = height = 0&quot;</code> implies that the first hypothesis assumes that the parameter <code>weight</code> is larger than the parameter <code>height</code> and that the parameter <code>height</code> is positive, and the second hypothesis assumes that the two parameters are equal to zero. Note that the first hypothesis could equivalently have been written as <code>weight &gt; height &gt; 0</code>.</li>
 </ul></li>
-<li><code>prior</code>, a numeric vector specifying the prior probabilities of the hypotheses. The default setting is <code>prior = NULL</code> which sets equal prior probabilities.</li>
+<li><code>prior.hyp</code>, a numeric vector specifying the prior probabilities of the hypotheses of the <code>hypothesis</code> argument. The default setting is <code>prior.hyp = NULL</code> which sets equal prior probabilities.</li>
 <li><code>complement</code>, a logical value which specified if a complement hypothesis is included in the tested hypotheses specified under <code>hypothesis</code>. The default setting is <code>TRUE</code>. The complement hypothesis covers the remaining parameters space that is not covered by the constrained hypotheses. For example, if an equality hypothesis and an order hypothesis are formulated, say, <code>hypothesis = &quot;weight = height = length; weight &gt; height &gt; length&quot;</code>, the complement hypothesis covers the remaining subspace where neither <code>&quot;weight = height = length&quot;</code> holds, nor <code>&quot;weight &gt; height &gt; length&quot;</code> holds.</li>
 </ul>
 <p>Alternatively if one is interesting in testing hypotheses on a model object which has a class that is currently not supported, an approximate Bayesian test can be executed with the following (additional) arguments</p>
