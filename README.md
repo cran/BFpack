@@ -5,7 +5,12 @@
 
 [![CRAN
 Version](http://www.r-pkg.org/badges/version/BFpack)](https://cran.r-project.org/package=BFpack)
-[![Downloads](https://cranlogs.r-pkg.org/badges/BGGM)](https://cran.r-project.org/package=BFpack)
+[![Downloads](https://cranlogs.r-pkg.org/badges/BFpack)](https://cran.r-project.org/package=BFpack)
+[![R-CMD-check](https://github.com/jomulder/BFpack/workflows/R-CMD-check/badge.svg)](https://github.com/jomulder/BFpack/actions)
+<!-- Insert codecov badge here -->
+
+[![Contributor
+Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](https://www.contributor-covenant.org/version/2/0/code_of_conduct.html)
 
 The `R` package **BFpack** contains a set of functions for exploratory
 hypothesis testing (e.g., equal vs negative vs postive) and confirmatory
@@ -46,14 +51,14 @@ Below several example analyses are provided using **BFpack**.
 
 ### Bayesian t testing
 
-First a classical one sample t test is executed for the test value
-\(\mu = 5\) on the therapeutic data
+First a classical one sample t test is executed on the test value
+\(&mu = 5\) on the `therapeutic` data (part of `BFpack`). Here a right one-tailed classical test is executed:
 
 ``` r
 ttest1 <- bain::t_test(therapeutic, alternative = "greater", mu = 5)
 ```
 
-The `t_test` function is part of the ***bain*** package. The function is
+The `t_test` function is part of the **bain** package. The function is
 equivalent to the standard `t.test` function with the addition that the
 returned object contains additional output than the standard `t.test`
 function.
@@ -66,7 +71,7 @@ library(BFpack)
 BF1 <- BF(ttest1)
 ```
 
-This executes an exhaustive test around the null value: `H1: mu = 5`
+This executes an exploratoory ('exhaustive') test around the null value: `H1: mu = 5`
 versus `H2: mu < 5` versus `H3: mu > 5` assuming equal prior
 probabilities for `H1`, `H2`, and `H3` of 1/3. The output presents the
 posterior probabilities for the three hypotheses.
@@ -82,6 +87,16 @@ BF(ttest1, hypothesis = hypothesis)
 When testing hypotheses via the `hypothesis` argument, the output also
 presents an `Evidence matrix` containing the Bayes factors between the
 hypotheses.
+
+The argument `prior.hyp` can be used to specify different prior probabilities
+for the hypotheses. For example, when the left one-tailed hypothesis is not possible
+based on prior considerations (e.g., see [preprint](https://arxiv.org/abs/1911.07728)) while the precise (null) hypothesis and the right
+one-tailed hypothesis are equally likely, the argument `prior.hyp` should be a vector
+specifying the prior probabilities of the respective hypotheses
+``` r
+BF(ttest1, hypothesis = "mu = 5; mu < 5; mu > 5", prior.hyp = c(.5,0,.5))
+```
+
 
 ### Analysis of variance
 
@@ -156,8 +171,7 @@ print(BF1)
 ```
 
 Constraints can also be tested between correlations, e.g., whether all
-correlations are equal and positive versus an unconstrained
-complement.
+correlations are equal and positive versus an unconstrained complement.
 
 ``` r
 BF2 <- BF(cor1, hypothesis = "Del_with_Im = Wmn_with_Im = Wmn_with_Del > 0")
@@ -177,8 +191,7 @@ print(BF1)
 
 Hypotheses can be tested with equality and/or order constraints on the
 effects of interest. If prefered the complement hypothesis can be
-omitted using the `complement`
-argument
+omitted using the `complement` argument
 
 ``` r
 BF2 <- BF(lm1, hypothesis = "Vehicle > 0 & Face < 0; Vehicle = Face = 0",
@@ -216,8 +229,7 @@ estimates via the `n` argument. Bayes factors are then computed using
 Gaussian approximations of the likelihood (and posterior), similar as in
 classical Wald test.
 
-We illustrate this for a Poisson regression
-model
+We illustrate this for a Poisson regression model
 
 ``` r
 poisson1 <- glm(formula = breaks ~ wool + tension, data = datasets::warpbreaks,
@@ -257,9 +269,9 @@ when calling `print(BF11)` and `print(BF2)`).
 You can cite the package and the paper using the following reference
 
 > Mulder, J., van Lissa, C., Gu, X., Olsson-Collentine, A.,
-> Boeing-Messing, F., Williams, D. R., Fox, J.-P., Menke, J., et al.
-> (2019). BFpack: Flexible Bayes Factor Testing of Scientific
-> Expectations. (Version 0.2.1) \[R package\].
+> Boeing-Messing, F., Williams, D. R., Fox, J.-P., Menke, J., et
+> al. (2020). BFpack: Flexible Bayes Factor Testing of Scientific
+> Expectations. (Version 0.3.1) \[R package\].
 > <https://CRAN.R-project.org/package=BFpack>
 
 > Mulder, J., Williams, D. R., Gu, X., Olsson-Collentine, A., Tomarken,

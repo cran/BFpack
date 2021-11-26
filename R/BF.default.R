@@ -60,8 +60,15 @@ BF.default <- function(x,
     RrO <- RrList[[2]]
 
     # RrStack is used to check conflicting constraints, and for the default prior location
-    RrStack <- rbind(do.call(rbind,RrE),do.call(rbind,RrO))
-    RrStack <- interval_RrStack(RrStack)
+    if(length(RrE)==1){
+      RrStack <- rbind(do.call(rbind,RrE),do.call(rbind,RrO))
+      RrStack <- interval_RrStack(RrStack)
+    }else{
+      RrStack_list <- lapply(1:length(RrE),function(h){
+        interval_RrStack(rbind(RrE[[h]],RrO[[h]]))
+      })
+      RrStack <- do.call(rbind,RrStack_list)
+    }
     K <- length(meanN)
     if(nrow(RrStack)>1){
       RStack <- RrStack[,-(K+1)]
@@ -140,6 +147,7 @@ BF.default <- function(x,
     colnames(BFtable) <- c("complex=","complex>","fit=","fit>","BF=","BF>","BF","PHP")
     BFmatrix_confirmatory <- matrix(rep(BFtu_confirmatory,length(BFtu_confirmatory)),ncol=length(BFtu_confirmatory))/
       t(matrix(rep(BFtu_confirmatory,length(BFtu_confirmatory)),ncol=length(BFtu_confirmatory)))
+    diag(BFmatrix_confirmatory) <- 1
     # row.names(BFmatrix_confirmatory) <- Hnames
     # colnames(BFmatrix_confirmatory) <- Hnames
     if(nrow(relfit)==length(parse_hyp$original_hypothesis)){
