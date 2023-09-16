@@ -2,7 +2,7 @@
 #include <stdlib.h> // for NULL
 #include <R_ext/Rdynload.h>
 
-/* FIXME: 
+/* FIXME:
    Check these declarations against the C/Fortran source code.
 */
 
@@ -25,3 +25,4 @@ void R_init_BFpack(DllInfo *dll)
     R_registerRoutines(dll, NULL, NULL, FortranEntries, NULL);
     R_useDynamicSymbols(dll, FALSE);
 }
+

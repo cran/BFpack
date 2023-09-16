@@ -3,13 +3,29 @@
 #' @importFrom Matrix rankMatrix
 #' @importFrom stats rWishart qt
 #' @importFrom MASS ginv
+#' @describeIn BF S3 method for an object of class 'lm'
 #' @method BF lm
 #' @export
 BF.lm <- function(x,
                   hypothesis = NULL,
                   prior.hyp = NULL,
                   complement = TRUE,
+                  BF.type = 2,
                   ...){
+
+  if(is.null(BF.type)){
+    stop("The argument 'BF.type' must be the integer 1 (for the fractional BF) or 2 (for the adjusted fractional BF).")
+  }
+  if(!is.null(BF.type)){
+    if(is.na(BF.type) | (BF.type!=1 & BF.type!=2))
+    stop("The argument 'BF.type' must be the integer 1 (for the fractional BF) or 2 (for the adjusted fractional BF).")
+  }
+  if(BF.type==2){
+    bayesfactor <- "generalized adjusted fractional Bayes factors"
+  }else{
+    bayesfactor <- "generalized fractional Bayes factors"
+  }
+  testedparameter <- "regression coefficients"
 
   # default BF on location parameters in a univarite normal linear model
   # Note that it is recommended that the fitten model is based on standardized covariates.
@@ -21,9 +37,6 @@ BF.lm <- function(x,
   K <- length(x$coefficients)/P # dimension of predictors per dependent variable
   dummyX <- rep(F,K)
   names(dummyX) <- row.names(x$coefficients)
-
-  bayesfactor <- "generalized adjusted fractional Bayes factors"
-  testedparameter <- "regression coefficients"
 
   Xmat <- model.matrix(x)
   Ymat <- model.matrix(x)%*%x$coefficients + x$residuals
@@ -153,7 +166,11 @@ BF.lm <- function(x,
   # prior hyperparameters
   df0 <- 1 # should be the same as sum(rep(bj,times=Nj))-K-P+1
   Scale0 <- kronecker(S_b,tXXi_b)
-  mean0 <- as.matrix(rep(0,K*P))
+  if(BF.type==2){
+    mean0 <- as.matrix(rep(0,K*P))
+  }else{
+    mean0 <- as.matrix(c(BetaHat))
+  }
   # posterior hyperparameters
   dfN <- N-K-P+1
   ScaleN <- kronecker(S,tXXi)/(N-K-P+1) # off-diagonal elements have no meaning
@@ -344,7 +361,12 @@ BF.lm <- function(x,
     if(P > 1){
 
       #default prior location
-      Mean0 <- matrix(c(ginv(RStack)%*%rStack),nrow=K,ncol=P)
+      if(BF.type==2){
+        Mean0 <- matrix(c(ginv(RStack)%*%rStack),nrow=K,ncol=P)
+      }else{
+        Mean0 <- BetaHat #mean0
+      }
+      #Mean0 <- matrix(c(ginv(RStack)%*%rStack),nrow=K,ncol=P)
 
       relmeasunlist <- unlist(lapply(1:numhyp,function(h){
         # Check whether the constraints are on a single row or column, if so
@@ -487,7 +509,12 @@ BF.lm <- function(x,
       # prior hyperparameters
       df0 <- 1 # should be the same as sum(rep(bj,times=Nj))-K-P+1
       Scale0 <- kronecker(S_b,tXXi_b)
-      mean0 <- ginv(RStack)%*%rStack
+      #default prior location
+      if(BF.type==2){
+        mean0 <- ginv(RStack)%*%rStack
+      }else{
+        mean0 <- BetaHat #mean0
+      }
       # posterior hyperparameters
       dfN <- N-K-P+1
       ScaleN <- kronecker(S,tXXi)/(N-K-P+1) # off-diagonal elements have no meaning
@@ -967,8 +994,8 @@ Student_prob_Hc <- function(mean1,scale1,df1,relmeas1,constraints,RrO1=NULL){
           rownames(relmeas)[numhyp+1] <- "complement"
         }else{ #the order constrained subspaces at least partly overlap
 
-          # funtion below gives a rough estimate of the posterior probability under Hc
-          # a bain type of algorithm would be better of course. but for now this is ok.
+          # the function below gives a rough estimate of the posterior probability under Hc
+          # a bain type of algorithm would be better of course.
 
           randomDraws <- rmvt(draws2,delta=mean1,sigma=scale1,df=df1)
           checksOC <- lapply(welk,function(h){

@@ -2,29 +2,64 @@
 
 
 #' @importFrom stats qnorm dnorm pnorm
+#' @describeIn BF S3 method for a named vector 'x'
 #' @method BF default
 #' @export
 BF.default <- function(x,
                        hypothesis = NULL,
                        prior.hyp = NULL,
                        complement = TRUE,
-                       ...,
                        Sigma,
-                       n){
+                       n,
+                       ...){
 
   #Input is a named mean vector x, covariance matrix and number of observations
   #These are extracted by the relevant method functions from a model object and
   #passed together with the hypothesis and prior to the Gaussian_estimator
 
-  meanN <- x #the posterior mean is approximated with the estimate
-  covmN <- Sigma    #the posterior covariance matrix is approximated with the error covariance matrix
+  # use Savage-Dickey approximation of the BF
+  BF_out <- Savage.Dickey.Gaussian(prior.mean = rep(0, length(x)),
+                                         prior.sigma = Sigma * n,
+                                         post.mean = x,
+                                         post.sigma = Sigma,
+                                         hypothesis = hypothesis,
+                                         prior.hyp = prior.hyp,
+                                         complement = complement)
+
+  BF_out$model <- x
+  BF_out$call <- match.call()
+  BF_out$bayesfactor <- "adjusted fractional Bayes factors using Gaussian approximations"
+  BF_out$parameter <- "general parameters"
+
+  BF_out
+
+}
+
+# extended Savage-Dickey density ratio for multivariate normal prior and posterior
+Savage.Dickey.Gaussian <- function(prior.mean,
+                                   prior.sigma,
+                                   post.mean,
+                                   post.sigma,
+                                   hypothesis,
+                                   prior.hyp,
+                                   complement){
+
+  #prior.mean is a normal prior mean of key parameters
+  #prior.sigma is a normal prior covariance matrix of key parameters
+  #post.mean is a normal posterior mean of key parameters
+  #post.sigma is a normal posterior covariance matrix of key parameters
+  #These are passed together with the hypothesis and prior to the Gaussian_estimator
+  #the prior of the nuisance parameters under the constrained models is a conditional version of the full prior
+
+  meanN <- post.mean     #the posterior mean is approximated with the estimate
+  covmN <- post.sigma    #the posterior covariance matrix is approximated with the error covariance matrix
 
   names_coef <- names(meanN)
-  covm0 <- covmN * n
-  mean0 <- as.matrix(rep(0, length(names_coef)))
+  covm0 <- prior.sigma
+  mean0 <- prior.mean # for constrained testing prior mean is relocated to 'boundary of constrained space'
 
   # compute exploratory BFs for each parameter
-  relfit <- matrix(c(dnorm(0,mean=meanN,sd=sqrt(diag(covmN))), #[Anton] Are these relfit/relcomp computations general or specific to correlations? [Joris] This is general. So it also works for these parameters.
+  relfit <- matrix(c(dnorm(0,mean=meanN,sd=sqrt(diag(covmN))),
                      pnorm(0,mean=meanN,sd=sqrt(diag(covmN))),
                      1-pnorm(0,mean=meanN,sd=sqrt(diag(covmN)))),ncol=3)
 
@@ -97,10 +132,6 @@ BF.default <- function(x,
     } else {
       numindep <- 1
     }
-    #default prior location
-    mean0 <- ginv(RStack)%*%rStack
-    #default prior covariance
-    covm0 <- covmN * n / numindep
 
     #get relative fit and complexity of hypotheses
     numhyp <- length(RrE)
@@ -167,18 +198,16 @@ BF.default <- function(x,
     prior.hyp=priorprobs,
     hypotheses=hypotheses,
     estimates=postestimates,
-    model=x,
-    bayesfactor="adjusted fractional Bayes factors using Gaussian approximations",
+    model=NULL,
+    bayesfactor="Bayes factors using Gaussian approximations",
     parameter="general parameters",
-    call=match.call())
+    call=NULL)
 
   class(BF_out) <- "BF"
 
   BF_out
 
 }
-
-
 
 # compute relative meausures (fit or complexity) under a multivariate Gaussian distribution
 #' @importFrom mvtnorm dmvnorm pmvnorm

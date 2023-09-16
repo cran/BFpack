@@ -1,8 +1,7 @@
-# BFpack 0.3.1
+# BFpack 1.2.2
 
-* Date: 2020-10-16
-* New extension for BF for rma.uni object (metafor package) for Bayesian meta-analysis
-* BF for lmerMod object now also works on unbalanced data
-* vignette was added
-* Bugs fixes
+* Date: 2023-09-11
+* Extension of BF.ergm and BF.bergm for Bayesian hypothesis testing under exponential random graph models
+* Updates on the random number generation in Fortran subroutines.
+* Minor edits.
 
