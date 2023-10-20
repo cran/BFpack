@@ -1,7 +1,7 @@
 Package: BFpack
 Type: Package
 Title: Flexible Bayes Factor Testing of Scientific Expectations
-Version: 1.2.2
+Version: 1.2.3
 Authors@R: 
     c(person(given = c("Joris"),
              family = "Mulder",
@@ -17,7 +17,7 @@ Authors@R:
              email = "drwwilliams@ucdavis.edu"),
       person(given = "Xin",
              family = "Gu",
-             role = "aut",
+             role = c("aut", "ctb"),
              email = "guxin57@hotmail.com"),
       person(given = "Anton",
              family = "Olsson-Collentine",
@@ -80,19 +80,20 @@ Authors@R:
       person("The R Core Team", role = "cph")
              )
 Maintainer: Joris Mulder <j.mulder3@tilburguniversity.edu>
-Description: Implementation of various default Bayes factors
-    for testing statistical hypotheses. The package is
+Description: Implementation of default Bayes factors
+    for testing statistical hypotheses under various statistical models. The package is
     intended for applied quantitative researchers in the
     social and behavioral sciences, medical research,
     and related fields. The Bayes factor tests can be
     executed for statistical models such as 
     univariate and multivariate normal linear models,
-    generalized linear models, special cases of 
+    correlation analysis, generalized linear models, special cases of 
     linear mixed models, survival models, relational
     event models. Parameters that can be tested are
     location parameters (e.g., group means, regression coefficients),
     variances (e.g., group variances), and measures of 
-    association (e.g,. bivariate correlations), among others.
+    association (e.g,. polychoric/polyserial/biserial/tetrachoric/product
+    moments correlations), among others.
     The statistical underpinnings are
     described in 
     Mulder and Xin (2019) <DOI:10.1080/00273171.2021.1904809>,
@@ -114,16 +115,16 @@ LazyData: true
 NeedsCompilation: yes
 RoxygenNote: 7.2.1
 Depends: R (>= 3.0.0), bain
-Imports: stats, MASS, Matrix, mvtnorm, pracma, lme4, extraDistr, ergm,
-        Bergm, sandwich
+Imports: stats, utils, MASS, mvtnorm, pracma, lme4, extraDistr, ergm,
+        Bergm, sandwich, QRM
 Suggests: testthat, polycor, survival, pscl, metafor, knitr, rmarkdown,
         lmtest
 VignetteBuilder: knitr
-Packaged: 2023-09-12 09:55:48 UTC; jorismulder
+Packaged: 2023-10-19 12:15:00 UTC; jorismulder
 Author: Joris Mulder [aut, cre],
   Caspar van Lissa [aut, ctb],
   Donald R. Williams [aut, ctb],
-  Xin Gu [aut],
+  Xin Gu [aut, ctb],
   Anton Olsson-Collentine [aut, ctb],
   Florian Boeing-Messing [aut, ctb],
   Jean-Paul Fox [aut, ctb],
@@ -144,4 +145,4 @@ Author: Joris Mulder [aut, cre],
   Jean-Pierre Moreau [ctb],
   The R Core Team [cph]
 Repository: CRAN
-Date/Publication: 2023-09-16 05:42:38 UTC
+Date/Publication: 2023-10-20 09:00:16 UTC

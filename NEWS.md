@@ -1,3 +1,11 @@
+# BFpack 1.2.3
+
+* Date: 2023-10-16
+* Faster computation of BFs for correlations.
+* Further updates of Fortran code according to CRAN guidelines.
+* Minor edits.
+
+
 # BFpack 1.2.2
 
 * Date: 2023-09-11

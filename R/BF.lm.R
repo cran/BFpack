@@ -1,6 +1,5 @@
-#' @importFrom pracma rref
+#' @importFrom pracma rref Rank
 #' @importFrom mvtnorm dmvnorm pmvnorm rmvnorm dmvt pmvt rmvt
-#' @importFrom Matrix rankMatrix
 #' @importFrom stats rWishart qt
 #' @importFrom MASS ginv
 #' @describeIn BF S3 method for an object of class 'lm'
@@ -631,7 +630,7 @@ MatrixStudent_measures <- function(Mean1,Scale1,tXXi1,df1,RrE1,RrO1,Names1=NULL,
       qO1 <- nrow(RO1)
       rO1 <- RrO1[,(K*P+1)]
 
-      if(rankMatrix(RO1)[[1]]==nrow(RO1)){ #RO1 is of full row rank. So use transformation.
+      if(Rank(RO1)==nrow(RO1)){ #RO1 is of full row rank. So use transformation.
 
         Scale1inv <- solve(Scale1)
         relO <- unlist(lapply(1:1e3,function(s){
@@ -690,7 +689,7 @@ MatrixStudent_measures <- function(Mean1,Scale1,tXXi1,df1,RrE1,RrO1,Names1=NULL,
       mean1_E <- RE1 %*% mean1
       relE <- mean(unlist(lapply(covm1_E,function(temp) dmvnorm(rE1,mean=mean1_E,sigma=temp))))
 
-      if(rankMatrix(Rr1)[[1]] == nrow(Rr1)){
+      if(Rank(Rr1) == nrow(Rr1)){
         covm1_O <- lapply(SigmaList,function(temp) R1%*%(kronecker(temp,tXXi1))%*%t(R1) )
         mean1_O <- c(R1%*%mean1)
 
@@ -755,7 +754,7 @@ Student_measures <- function(mean1,Scale1,df1,RrE1,RrO1,names1=NULL,constraints1
     qO1 <- nrow(RO1)
     rO1 <- RrO1[,(K+1)]
 
-    if(rankMatrix(RO1)[[1]]==nrow(RO1)){ #RO1 is of full row rank. So use transformation.
+    if(Rank(RO1)==nrow(RO1)){ #RO1 is of full row rank. So use transformation.
       meanO <- c(RO1%*%mean1)
       scaleO <- RO1%*%Scale1%*%t(RO1)
       relO <- ifelse(nrow(scaleO)==1,
@@ -837,7 +836,7 @@ Student_measures <- function(mean1,Scale1,df1,RrE1,RrO1,names1=NULL,constraints1
     Tscale1OgE <- as.vector((df1 + (t(matrix(rE1 - Tmean1E)) %*% solve(Tscale1EE) %*% matrix(rE1 - Tmean1E))) /
                               (df1 + qE1)) * (Tscale1OO - Tscale1OE %*% solve(Tscale1EE) %*% t(Tscale1OE))
 
-    if(rankMatrix(RO1tilde)[[1]] == nrow(RO1tilde)){
+    if(Rank(RO1tilde) == nrow(RO1tilde)){
       rO1tilde <- as.vector(rO1tilde)
 
       delta_trans <- as.vector(RO1tilde %*% Tmean1OgE)
@@ -1109,125 +1108,10 @@ interval_RrStack <- function(RrStack){
   return(RrStack_out)
 }
 
-
 params_in_hyp <- function(hyp){
   params_in_hyp <- trimws(unique(strsplit(hyp, split = "[ =<>,\\(\\);&\\*+-]+", perl = TRUE)[[1]]))
   params_in_hyp <- params_in_hyp[!sapply(params_in_hyp, grepl, pattern = "^[0-9]*\\.?[0-9]+$")]
   params_in_hyp[grepl("^[a-zA-Z]", params_in_hyp)]
 }
-
-#dyn.load("/Users/jorismulder/surfdrive/R packages/BFpack/scr/bct_continuous_final.dll")
-# R function to call Fortran subroutine for Gibbs sampling using noninformative improper
-# priors for regression coefficients, Jeffreys priors for standard deviations, and a proper
-# joint uniform prior for the correlation matrices.
-# dyn.load("/Users/jorismulder/surfdrive/R packages/BFpack/src/bct_continuous_final.dll")
-estimate_postMeanCov_FisherZ <- function(YXlist,numdraws=5e3){
-  # YXlist should be a list of length number of independent groups, of which each
-  # element is another list of which the first element is a matrix of dependent
-  # variables in the group, and the second element is a matrix of covariate variables
-  # in the group.
-
-  numG <- length(YXlist)
-  P <- ncol(YXlist[[1]][[1]])
-  K <- ncol(YXlist[[1]][[2]])
-  numcorr <- numG*P*(P-1)/2
-  ngroups <- unlist(lapply(1:numG,function(g){nrow(YXlist[[g]][[1]])}))
-  Ntot <- max(ngroups)
-  Ygroups <- array(0,dim=c(numG,Ntot,P))
-  Xgroups <- array(0,dim=c(numG,Ntot,K))
-  XtXi <- array(0,dim=c(numG,K,K))
-  BHat <- array(0,dim=c(numG,K,P))
-  sdHat <- matrix(0,nrow=numG,ncol=P)
-  CHat <- array(0,dim=c(numG,P,P))
-  SumSq <- array(0,dim=c(numG,P,P))
-  SumSqInv <- array(0,dim=c(numG,P,P))
-
-  for(g in 1:numG){
-    Y_g <- scale(YXlist[[g]][[1]])
-    X_g <- YXlist[[g]][[2]]
-    Ygroups[g,1:ngroups[g],] <- Y_g
-    #standardize data to get a more stable sampler for the correlations.
-    tableX <- apply(X_g,2,table)
-    catX <- unlist(lapply(1:length(tableX),function(xcol){
-      length(tableX[[xcol]])
-    }))
-    if(sum(catX>1)){
-      X_g[1:ngroups[g],which(catX>1)] <- apply(as.matrix(X_g[1:ngroups[g],which(catX>1)]),2,scale)
-    }
-    Xgroups[g,1:ngroups[g],] <- X_g
-    XtXi[g,,] <- solve(t(X_g)%*%X_g)
-    BHat[g,,] <- XtXi[g,,]%*%t(X_g)%*%Y_g
-    SumSq[g,,] <- t(Y_g - X_g%*%BHat[g,,])%*%(Y_g - X_g%*%BHat[g,,])
-    SumSqInv[g,,] <- solve(SumSq[g,,])
-    Sigma_g <- SumSq[g,,]/ngroups[g]
-    sdHat[g,] <- sqrt(diag(Sigma_g))
-    CHat[g,,] <- diag(1/sdHat[g,])%*%Sigma_g%*%diag(1/sdHat[g,])
-  }
-  samsize0 <- numdraws
-  #  random1 <- rnorm(1)
-  #  random1 <- (random1 - floor(random1))*1e6
-
-  # call Fortran subroutine for Gibbs sampling using noninformative improper priors
-  # for regression coefficients, Jeffreys priors for standard deviations, and a proper
-  # joint uniform prior for the correlation matrices.
-  res <-.Fortran("estimate_postmeancov_fisherz",
-                 postZmean=matrix(0,numcorr,1),
-                 postZcov=matrix(0,numcorr,numcorr),
-                 P=as.integer(P),
-                 numcorr=as.integer(numcorr),
-                 K=as.integer(K),
-                 numG=as.integer(numG),
-                 BHat=BHat,
-                 sdHat=sdHat,
-                 CHat=CHat,
-                 XtXi=XtXi,
-                 samsize0=as.integer(samsize0),
-                 Njs=as.integer(ngroups),
-                 Ygroups=Ygroups,
-                 Xgroups=Xgroups,
-                 Ntot=as.integer(Ntot),
-                 C_quantiles=array(0,dim=c(numG,P,P,3)),
-                 sigma_quantiles=array(0,dim=c(numG,P,3)),
-                 B_quantiles=array(0,dim=c(numG,K,P,3)),
-                 BDrawsStore=array(0,dim=c(samsize0,numG,K,P)),
-                 sigmaDrawsStore=array(0,dim=c(samsize0,numG,P)),
-                 CDrawsStore=array(0,dim=c(samsize0,numG,P,P)),
-                 seed=as.integer( sample.int(1e6,1) ))
-
-  FmeansCovCorr <- lapply(1:numG,function(g){
-    Fdraws_g <- FisherZ(t(matrix(unlist(lapply(1:samsize0,function(s){
-      res$CDrawsStore[s,g,,][lower.tri(diag(P))]
-    })),ncol=samsize0)))
-    mean_g <- apply(Fdraws_g,2,mean)
-    covm_g <- cov(Fdraws_g)
-    return(list(mean_g,covm_g))
-  })
-  meansCovCorr <- lapply(1:numG,function(g){
-    draws_g <- t(matrix(unlist(lapply(1:samsize0,function(s){
-      res$CDrawsStore[s,g,,][lower.tri(diag(P))]
-    })),ncol=samsize0))
-    mean_g <- apply(draws_g,2,mean)
-    return(mean_g)
-  })
-  meanN <- unlist(lapply(1:numG,function(g){
-    FmeansCovCorr[[g]][[1]]
-  }))
-  covmN <- matrix(0,nrow=numcorr,ncol=numcorr)
-  numcorrg <- numcorr/numG
-  for(g in 1:numG){
-    covmN[(g-1)*numcorrg+1:numcorrg,(g-1)*numcorrg+1:numcorrg] <- FmeansCovCorr[[g]][[2]]
-  }
-  return(list(corr_quantiles=res$C_quantiles,B_quantiles=res$B_quantiles,
-              sigma_quantiles=res$sigma_quantiles,meanN=meanN,covmN=covmN,
-              corr_means=meansCovCorr))
-}
-
-
-# Fisher Z tranformation for sampled correlations
-FisherZ <- function(r){.5*log((1+r)/(1-r))}
-
-
-
-
 
 
