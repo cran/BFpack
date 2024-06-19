@@ -1,6 +1,5 @@
 
 # test for BF on an ergm object
-library(BFpack)
 
 #check if confirmatory test are the same for ergm object
 test_that("BF.ergm tests", {
@@ -14,16 +13,26 @@ test_that("BF.ergm tests", {
                      absdiff("wealth"),
                    control = control.ergm(seed = seed))
   get_estimates(ergm_fit)
+  seed <- 123
   BFergm.test <- BF(ergm_fit,
                     hypothesis = "0 = absdiff.wealth > kstar2",
                     main.iters = 500)
   expect_true(
-    all.equal(c(0.2,0.8),
+    all.equal(c(0.185,0.815),
               unname(BFergm.test$PHP_confirmatory), tolerance = .2)
   )
   expect_true(
     all.equal(c(0.1,0,0.9),
               unname(BFergm.test$PHP_exploratory[2,]), tolerance = .2)
+  )
+  seed <- 123
+  BFergm.test2 <- BF(ergm_fit,
+                     hypothesis = "0 = absdiff.wealth > kstar2",
+                     main.iters = 500,prior.hyp.explo = 1:3)
+  expect_equivalent(
+    unname(BFergm.test2$PHP_exploratory[1,]),
+    unname(BFergm.test$BFtu_exploratory[1,]*(1:3)/sum(BFergm.test$BFtu_exploratory[1,]*(1:3))),
+    tol=.05
   )
 })
 
@@ -42,6 +51,7 @@ test_that("BF.bergm one hypotheses correctly evaluated", {
   expect_true(
     all.equal(0.17,
               unname(BFbergm.test$PHP_confirmatory)[1], tolerance = .2)
-  )})
+  )
+})
 
 

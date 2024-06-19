@@ -1,7 +1,7 @@
 Package: BFpack
 Type: Package
 Title: Flexible Bayes Factor Testing of Scientific Expectations
-Version: 1.2.3
+Version: 1.3.0
 Authors@R: 
     c(person(given = c("Joris"),
              family = "Mulder",
@@ -113,14 +113,14 @@ BugReports: https://github.com/jomulder/BFpack/issues
 Encoding: UTF-8
 LazyData: true
 NeedsCompilation: yes
-RoxygenNote: 7.2.1
+RoxygenNote: 7.3.1
 Depends: R (>= 3.0.0), bain
 Imports: stats, utils, MASS, mvtnorm, pracma, lme4, extraDistr, ergm,
         Bergm, sandwich, QRM
 Suggests: testthat, polycor, survival, pscl, metafor, knitr, rmarkdown,
         lmtest
 VignetteBuilder: knitr
-Packaged: 2023-10-19 12:15:00 UTC; jorismulder
+Packaged: 2024-06-18 20:02:49 UTC; jorismulder
 Author: Joris Mulder [aut, cre],
   Caspar van Lissa [aut, ctb],
   Donald R. Williams [aut, ctb],
@@ -145,4 +145,4 @@ Author: Joris Mulder [aut, cre],
   Jean-Pierre Moreau [ctb],
   The R Core Team [cph]
 Repository: CRAN
-Date/Publication: 2023-10-20 09:00:16 UTC
+Date/Publication: 2024-06-19 10:50:02 UTC

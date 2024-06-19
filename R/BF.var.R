@@ -91,20 +91,42 @@ bartlett_test.default <- function(x, g, ...){
 
 #' @importFrom stats rgamma
 #' @importFrom stats rchisq
+#' @importFrom extraDistr qinvgamma
 #' @method BF bartlett_htest
 #' @export
 BF.bartlett_htest <- function(x,
                            hypothesis = NULL,
+                           prior.hyp.explo = NULL,
+                           prior.hyp.conf = NULL,
                            prior.hyp = NULL,
                            complement = TRUE,
+                           log = FALSE,
+                           iter = 1e5,
                            ...) {
   get_est <- get_estimates(x)
-  nsim <- 1e5
+  nsim <- iter
   s2 <- get_est$estimate
   n <- c(x$n)
   b <- 2/n
   J <- length(n)
   names_coef <- names(get_est$estimate)
+  scale.post_group <- s2*(n-1)/2
+  shape.post_group <- (n-1)/2
+  postestimates <- cbind(NA,qinvgamma(.5,alpha=shape.post_group,beta=scale.post_group),
+                         qinvgamma(.025,alpha=shape.post_group,beta=scale.post_group),
+                         qinvgamma(.975,alpha=shape.post_group,beta=scale.post_group))
+  which.means <- which(shape.post_group>1)
+  postestimates[which.means,1] <- scale.post_group[which.means]/(shape.post_group[which.means]-1)
+  row.names(postestimates) <- names_coef
+  colnames(postestimates) <- c("mean","median","2.5%","97.5%")
+
+  logIN <- log
+
+  # check proper usage of argument 'prior.hyp.conf' and 'prior.hyp.explo'
+  if(!is.null(prior.hyp.conf)){
+    prior.hyp <- prior.hyp.conf
+  }
+  prior.hyp.explo <- process.prior.hyp.explo(prior_hyp_explo = prior.hyp.explo, model=x)
 
   # exploratory BF for equality of variances:
   logmx0 <- - 1 / 2 * sum((1 - b) * n) * log(pi) + 1 / 2 * log(prod(b)) +
@@ -115,11 +137,12 @@ BF.bartlett_htest <- function(x,
     sum(lgamma((n - 1) / 2) - lgamma((b * n - 1) / 2) -
           1 / 2 * (n - 1) * log((n - 1) * s2) +
           1 / 2 * (b * n - 1) * log(b * (n - 1) * s2))
-  BF0u <- exp(logmx0 - logmxu)
+  BF0u <- logmx0 - logmxu
 
-  BFtu_exploratory <- c(BF0u,1)
+  BFtu_exploratory <- c(BF0u,log(1))
   names(BFtu_exploratory) <- c("homogeneity of variances","no homogeneity of variances")
-  PHP_exploratory <- BFtu_exploratory / sum(BFtu_exploratory)
+  norm_BF_explo <- exp(BFtu_exploratory - max(BFtu_exploratory)) * prior.hyp.explo[[1]]
+  PHP_exploratory <- norm_BF_explo / sum(norm_BF_explo)
 
   if (!is.null(hypothesis)){
     parse_hyp <- parse_hypothesis(names_coef, hypothesis)
@@ -232,12 +255,12 @@ BF.bartlett_htest <- function(x,
       }
     }
     hypotheses <- names(logmx)
-    BFtu_confirmatory <- exp(logmx - logmxu)
-    BFmatrix_confirmatory <- BFtu_confirmatory %*% t(1 / BFtu_confirmatory)
-    diag(BFmatrix_confirmatory) <- 1
+    BFtu_confirmatory <- (logmx - logmxu)
+    BFmatrix_confirmatory <- BFtu_confirmatory %*% t(rep(1,length(BFtu_confirmatory))) -
+      rep(1,length(BFtu_confirmatory)) %*% t(BFtu_confirmatory)
+    diag(BFmatrix_confirmatory) <- log(1)
     names(BFtu_confirmatory) <- row.names(BFmatrix_confirmatory) <-
       colnames(BFmatrix_confirmatory) <- hypotheses
-    diag(BFmatrix_confirmatory) <- 1
 
     if(is.null(prior.hyp)){
       priorprobs <- rep(1/length(BFtu_confirmatory),length(BFtu_confirmatory))
@@ -250,7 +273,8 @@ BF.bartlett_htest <- function(x,
       }
     }
 
-    PHP_confirmatory <- BFtu_confirmatory * priorprobs / sum(BFtu_confirmatory * priorprobs)
+    PHP_confirmatory <- exp(BFtu_confirmatory - max(BFtu_confirmatory)) * priorprobs /
+      sum(exp(BFtu_confirmatory - max(BFtu_confirmatory)) * priorprobs)
     relcomp[which(is.na(relcomp))] <- 1
     relfit[which(is.na(relfit))] <- 1
     BF_E <- exp(logmxE - logmxu)
@@ -258,6 +282,15 @@ BF.bartlett_htest <- function(x,
                      relfit/relcomp,BF_E*relfit/relcomp,PHP_confirmatory)
     row.names(BFtable) <- names(PHP_confirmatory)
     colnames(BFtable) <- c("complex=","complex>","fit=","fit>","BF=","BF>","BF","PHP")
+
+    if(logIN == FALSE){
+      BFtu_confirmatory <- exp(BFtu_confirmatory)
+      BFmatrix_confirmatory <- exp(BFmatrix_confirmatory)
+    }
+  }
+
+  if(logIN == FALSE){
+    BFtu_exploratory <- exp(BFtu_exploratory)
   }
 
   BFlm_out <- list(
@@ -267,12 +300,14 @@ BF.bartlett_htest <- function(x,
     PHP_confirmatory=PHP_confirmatory,
     BFmatrix_confirmatory=BFmatrix_confirmatory,
     BFtable_confirmatory=BFtable,
-    prior.hyp=priorprobs,
+    prior.hyp.explo=prior.hyp.explo,
+    prior.hyp.conf=priorprobs,
     hypotheses=hypotheses,
-    estimates=s2,
+    estimates=postestimates,
     model=x,
     bayesfactor="generalized adjusted fractional Bayes factors",
     parameter="group variances",
+    log = logIN,
     call=match.call())
 
   class(BFlm_out) <- "BF"
@@ -315,7 +350,7 @@ inversegamma_prob_Hc <- function(shape1,scale1,relmeas,RrE1,RrO1,samsize1=1e5){
           names(relmeas)[numhyp+1] <- "complement"
         }else{ #the order constrained subspaces at least partly overlap
           randomDraws <- matrix(unlist(lapply(1:numpara,function(par){
-            1/rgamma(1e5,shape=shape1[par]/2,rate=scale1[par])
+            1/rgamma(1e5,shape=shape1[par],rate=scale1[par])
             #rinvgamma(1e5,shape=shape1[par]/2,scale=scale1[par])
           })),ncol=numpara)
           checksOCpost <- lapply(which(whichO),function(h){

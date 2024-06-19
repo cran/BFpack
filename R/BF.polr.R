@@ -5,8 +5,11 @@
 #' @export
 BF.polr <- function(x,
                        hypothesis = NULL,
+                       prior.hyp.explo = NULL,
+                       prior.hyp.conf = NULL,
                        prior.hyp = NULL,
                        complement = TRUE,
+                       log = FALSE,
                        ...){
 
   #Extract summary statistics
@@ -17,7 +20,10 @@ BF.polr <- function(x,
   Args$n <- nrow(x$fitted.values)
   Args$hypothesis <- hypothesis
   Args$prior.hyp <- prior.hyp
+  Args$prior.hyp.explo <- prior.hyp.explo
+  Args$prior.hyp.conf <- prior.hyp.conf
   Args$complement <- complement
+  Args$log <- log
   out <- do.call(BF, Args)
   out$model <- x
   out$call <- match.call()

@@ -1,30 +1,60 @@
 
-subroutine draw_ju(P,drawscorr,samsize,numcorrgroup,Fisher,seed)
+! rngfuncs.f90
+module rngfuncs1
+
+implicit none
+
+public
+
+! See the R header `R_ext/Random.h` for details
+interface
+    ! double unif_rand(void);
+    function unif_rand() bind(c,name="unif_rand")
+        use, intrinsic :: iso_c_binding, only: c_double
+        real(c_double) :: unif_rand
+    end function
+
+    ! void GetRNGstate(void);
+    subroutine getrngstate() bind(c,name="GetRNGstate")
+    end subroutine
+
+    ! void PutRNGstate(void);
+    subroutine putrngstate() bind(c,name="PutRNGstate")
+    end subroutine
+
+  end interface
+
+end module
+
+module rkinds1
+   use, intrinsic :: iso_c_binding
+   use, intrinsic :: iso_fortran_env
+   private
+   integer, parameter, public :: rint = int32   ! Using int32 from iso_fortran_env
+   integer, parameter, public :: rdp = real64   ! Using real64 from iso_fortran_env
+   ! Using real64 from iso_fortran_env
+end module
+
+
+subroutine draw_ju(P,drawscorr,samsize,numcorrgroup,Fisher)
     ! Fortran implementation of the algorithm proposed by Joe (2006)
+
+    use rkinds1, only: rint, rdp
+    use rngfuncs1
 
     implicit none
 
-    integer, parameter :: r15 = selected_real_kind(15)
-    integer, parameter :: i6 = selected_int_kind(6)
-
-    integer(i6), intent(in) :: P, samsize, numcorrgroup, Fisher, seed
-    integer(i6)             :: s1,r1, r2, i1, i2, k1, corrIndex(P,P), teldummy,&
-                               t1, t2, iseed, error1
-    real (r15)              :: corrMat(P,P),draw1(1),&
+    integer(rint), intent(in) :: P, samsize, numcorrgroup, Fisher
+    integer(rint)             :: s1,r1, r2, i1, i2, k1, corrIndex(P,P), teldummy,&
+                               t1, t2, error1
+    real (rdp)              :: corrMat(P,P),draw1(1),&
                                R2inv(P,P), vec1(P,1), vec2(P,1),&
                                dummy11(1,1), dummy12(1,1), dummy22(1,1),&
                                Di1i2, preinv(P,P)
-    real(r15), intent (out) :: drawscorr(samsize,numcorrgroup)
-    real(r15)               :: alpha
+    real(rdp), intent (out) :: drawscorr(samsize,numcorrgroup)
+    real(rdp)               :: alpha
 
 !========================================================================================!
-
-    !set seed
-    !call RANDOM_SEED(size=nn)
-    !allocate(iseed(nn))
-    !iseed(:) = seed
-    !call RANDOM_SEED(put=iseed)
-    iseed = seed
 
     ! create corrIndex matrix
     teldummy = 1
@@ -51,7 +81,7 @@ subroutine draw_ju(P,drawscorr,samsize,numcorrgroup,Fisher,seed)
         end do
         do r1 = 1,P-1
             alpha=P/2.0
-            draw1 = random_beta(alpha, alpha, .true., iseed)
+            draw1 = random_beta(alpha, alpha, .true.)
             draw1 = draw1*2.0-1.0
             corrMat(r1,r1+1) = draw1(1)
             corrMat(r1+1,r1) = corrMat(r1,r1+1)
@@ -66,7 +96,7 @@ subroutine draw_ju(P,drawscorr,samsize,numcorrgroup,Fisher,seed)
                 k1 = i2 - i1
                 !draw partial correlations
                 alpha = .5*(P+1-k1)
-                draw1 = random_beta(alpha, alpha, .true., iseed)
+                draw1 = random_beta(alpha, alpha, .true.)
                 draw1=draw1*2-1.0
                 !rbeta(1,.5*(dim+1-k),.5*(dim+1-k))*2-1
                 vec1(1:(k1-1),1) = corrMat(i1,(i1+1):(i1+k1-1))
@@ -96,111 +126,45 @@ subroutine draw_ju(P,drawscorr,samsize,numcorrgroup,Fisher,seed)
 contains
 
 
-!Subroutine to find the inverse of a square matrix
-!Author : Louisda16th a.k.a Ashwith J. Rego
-!Reference : Algorithm has been well explained in:
-!http://math.uww.edu/~mcfarlat/inverse.htm
-!http://www.tutor.ms.unimelb.edu.au/matrix/matrix_inverse.html
+! Subroutine to find the inverse of a square matrix
 SUBROUTINE FINDinv(matrix, inverse, n, errorflag)
 
     implicit none
-!
-    integer, parameter :: r15 = selected_real_kind(15)
-    integer, parameter :: i6 = selected_int_kind(6)
 
     !Declarations
-    INTEGER(i6), INTENT(IN) :: n
-    REAL(r15), INTENT(IN) :: matrix(n,n)  !Input matrix
-    INTEGER(i6), INTENT(OUT) :: errorflag  !Return error status. -1 for error, 0 for normal
-    REAL(r15), INTENT(OUT) :: inverse(n,n) !Inverted matrix
+    INTEGER(rint), INTENT(IN) :: n
+    REAL(rdp), INTENT(IN) :: matrix(n,n)  !Input matrix
+    INTEGER(rint), INTENT(OUT) :: errorflag  !Return error status. -1 for error, 0 for normal
+    REAL(rdp), INTENT(OUT) :: inverse(n,n) !Inverted matrix
 
-    LOGICAL :: FLAG = .TRUE.
-    INTEGER(i6) :: i, j, k
-    REAL(r15) :: m
-    REAL(r15), DIMENSION(n,2*n) :: augmatrix !augmented matrix
+    integer :: ipiv(n), info, lwork
+    real(rdp) :: work(n)
 
-    inverse = eye(n)
-    !Augment input matrix with an identity matrix
-    DO i = 1, n
-        DO j = 1, 2*n
-            IF (j <= n ) THEN
-                augmatrix(i,j) = matrix(i,j)
-            ELSE IF ((i+n) == j) THEN
-                augmatrix(i,j) = 1
-            Else
-                augmatrix(i,j) = 0
-            ENDIF
-        END DO
-    END DO
+    external :: dgetrf, dgetri
 
-    !Reduce augmented matrix to upper traingular form
-    DO k =1, n-1
-        IF (augmatrix(k,k) == 0) THEN
-            FLAG = .FALSE.
-            DO i = k+1, n
-                IF (augmatrix(i,k) /= 0) THEN
-                    DO j = 1,2*n
-                        augmatrix(k,j) = augmatrix(k,j)+augmatrix(i,j)
-                    END DO
-                    FLAG = .TRUE.
-                    EXIT
-                ENDIF
-                IF (FLAG .EQV. .FALSE.) THEN
-!                    PRINT*, "Matrix is non - invertible"
-                    inverse = 0
-                    errorflag = -1
-                    return
-                ENDIF
-            END DO
-        ENDIF
-        DO j = k+1, n
-            m = augmatrix(j,k)/augmatrix(k,k)
-            DO i = k, 2*n
-                augmatrix(j,i) = augmatrix(j,i) - m*augmatrix(k,i)
-            END DO
-        END DO
-    END DO
-
-    !Test for invertibility
-    DO i = 1, n
-        IF (augmatrix(i,i) == 0) THEN
-!            PRINT*, "Matrix is non - invertible"
-            inverse = 0
-            errorflag = -1
-            return
-        ENDIF
-    END DO
-
-    !Make diagonal elements as 1
-    DO i = 1 , n
-        m = augmatrix(i,i)
-        DO j = i , (2 * n)
-            augmatrix(i,j) = (augmatrix(i,j) / m)
-        END DO
-    END DO
-
-    !Reduced right side half of augmented matrix to identity matrix
-    DO k = n-1, 1, -1
-        DO i = 1, k
-            m = augmatrix(i,k+1)
-            DO j = k, (2*n)
-                augmatrix(i,j) = augmatrix(i,j) -augmatrix(k+1,j) * m
-            END DO
-        END DO
-    END DO
-
-    !store answer
-    DO i =1, n
-        DO j = 1, n
-            inverse(i,j) = augmatrix(i,j+n)
-        END DO
-    END DO
     errorflag = 0
+
+    inverse = matrix
+    call dgetrf(n,n,inverse,n,ipiv,info)
+    if (info > 0) then
+        inverse = 0
+        errorflag = -1
+        return
+    end if
+
+    lwork = n
+    call dgetri(n,inverse,n,ipiv,work,lwork,info)
+    if (info > 0) then
+        inverse = 0
+        errorflag = -1
+        return
+    end if
+
 END SUBROUTINE FINDinv
 
 
 
-FUNCTION random_beta(aa, bb, first, iseed) RESULT(fn_val)
+FUNCTION random_beta(aa, bb, first) RESULT(fn_val)
 
 ! Adapted from Fortran 77 code from the book:
 !     Dagpunar, J. 'Principles of random variate generation'
@@ -223,19 +187,16 @@ FUNCTION random_beta(aa, bb, first, iseed) RESULT(fn_val)
 
     implicit none
 
-    integer, parameter :: r15 = selected_real_kind(15)
-    integer, parameter :: i6 = selected_int_kind(6)
-
-    REAL(r15), INTENT(IN)    :: aa, bb
+    REAL(rdp), INTENT(IN)    :: aa, bb
     LOGICAL, INTENT(IN) :: first
-    INTEGER(i6), INTENT(IN) :: iseed
-    REAL ( kind = r15 )   :: fn_val
+    !INTEGER(rint), INTENT(IN) :: iseed
+    REAL ( kind = rdp )   :: fn_val
 
     !     Local variables
-    REAL(r15), PARAMETER  :: aln4 = 1.3862944, one=1.0, two=2.0, &
+    REAL(rdp), PARAMETER  :: aln4 = 1.3862944, one=1.0, two=2.0, &
                              vlarge = HUGE(1.0), vsmall = TINY(1.0), zero = 0.0
-    REAL ( kind = r15 ) :: a, b, g, r, s, x, y, z
-    REAL ( kind = r15 ), SAVE        :: d, f, h, t, c
+    REAL ( kind = rdp ) :: a, b, g, r, s, x, y, z
+    REAL ( kind = rdp ), SAVE        :: d, f, h, t, c
     LOGICAL, SAVE     :: swap
 
 
@@ -262,11 +223,10 @@ FUNCTION random_beta(aa, bb, first, iseed) RESULT(fn_val)
     END IF
 
     DO
-    r = runiform(iseed)
-    x = runiform(iseed)
+    r = unif_rand()
+    x = unif_rand()
     !print*, r,x
-    !CALL RANDOM_NUMBER(r)
-    !CALL RANDOM_NUMBER(x)
+
     s = r*r*x
     IF (r < vsmall .OR. s <= zero) CYCLE
     IF (r < t) THEN
@@ -287,132 +247,27 @@ FUNCTION random_beta(aa, bb, first, iseed) RESULT(fn_val)
 
     IF (swap) fn_val = one - fn_val
     RETURN
-    END FUNCTION random_beta
+END FUNCTION random_beta
 
-
-    function runiform ( iseed )
-
-!*****************************************************************************80
-!
-!! RUNIFORM returns a unit pseudorandom R8.
-!
-!  Discussion:
-!
-!    An R8 is a real ( kind = 8 ) value.
-!
-!    For now, the input quantity iseed is an integer variable.
-!
-!    This routine implements the recursion
-!
-!      iseed = ( 16807 * iseed ) mod ( 2^31 - 1 )
-!      runiform = iseed / ( 2^31 - 1 )
-!
-!    The integer arithmetic never requires more than 32 bits,
-!    including a sign bit.
-!
-!    If the initial iseed is 12345, then the first three computations are
-!
-!      Input     Output      RUNIFORM
-!      iseed      iseed
-!
-!         12345   207482415  0.096616
-!     207482415  1790989824  0.833995
-!    1790989824  2035175616  0.947702
-!
-!  Licensing:
-!
-!    This code is distributed under the GNU LGPL license.
-!
-!  Modified:
-!
-!    31 May 2007
-!
-!  Author:
-!
-!    John Burkardt
-!
-!  Reference:
-!
-!    Paul Bratley, Bennett Fox, Linus Schrage,
-!    A Guide to Simulation,
-!    Second Edition,
-!    Springer, 1987,
-!    ISBN: 0387964673,
-!    LC: QA76.9.C65.B73.
-!
-!    Bennett Fox,
-!    Algorithm 647:
-!    Implementation and Relative Efficiency of Quasirandom
-!    Sequence Generators,
-!    ACM Transactions on Mathematical Software,
-!    Volume 12, Number 4, December 1986, pages 362-376.
-!
-!    Pierre L'Ecuyer,
-!    Random Number Generation,
-!    in Handbook of Simulation,
-!    edited by Jerry Banks,
-!    Wiley, 1998,
-!    ISBN: 0471134031,
-!    LC: T57.62.H37.
-!
-!    Peter Lewis, Allen Goodman, James Miller,
-!    A Pseudo-Random Number Generator for the System/360,
-!    IBM Systems Journal,
-!    Volume 8, Number 2, 1969, pages 136-143.
-!
-!  Parameters:
-!
-!    Input/output, integer ( kind = 8 ) iseed, the "iseed" value, which should
-!    NOT be 0. On output, iseed has been updated.
-!
-!    Output, real ( kind = 8 ) RUNIFORM, a new pseudorandom variate,
-!    strictly between 0 and 1.
-!
-  implicit none
-
-  integer, parameter :: r15 = selected_real_kind(15)
-  integer, parameter :: i6 = selected_int_kind(6)
-
-  integer ( kind = i6 ), parameter :: i4_huge = 2147483647
-  integer ( kind = i6 ) k
-  real ( kind = r15 ) runiform
-  integer ( kind = i6 ) iseed
-
-  k = iseed / 127773
-
-  iseed = 16807 * ( iseed - k * 127773 ) - k * 2836
-
-  if ( iseed < 0 ) then
-    iseed = iseed + i4_huge
-  end if
-
-  runiform = real ( iseed, kind = r15 ) * 4.656612875D-10
-
-return
-end function
 
 
 function eye(n)
 
     implicit none
 
-    integer, parameter :: r15 = selected_real_kind(15)
-    integer, parameter :: i6 = selected_int_kind(6)
-
-    integer(i6):: i,n
-    real(r15):: eye(n,n)
-    real(r15):: check(n,n)
+    integer(rint):: i,n
+    real(rdp):: eye(n,n)
+    real(rdp):: check(n,n)
 
     check=0
     do i=1,n
         check(i,i)= 1
     enddo
 
-    eye(:,:)=check(:,:)
+    eye(:,:) = check(:,:)
     return
 
 end function eye
-
 
 
 end subroutine draw_ju

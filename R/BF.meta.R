@@ -9,8 +9,11 @@
 #' @export
 BF.rma.uni <- function(x,
                        hypothesis = NULL,
+                       prior.hyp.explo = NULL,
+                       prior.hyp.conf = NULL,
                        prior.hyp = NULL,
                        complement = TRUE,
+                       log = FALSE,
                        ...){
   # x should be of class rma.uni
   if(class(x)[1]!="rma.uni"){
@@ -22,6 +25,14 @@ BF.rma.uni <- function(x,
   if(!is.null(hypothesis)){
     message("Note that confirmatory testing via the 'hypothesis' argument is currently not supported for object of class 'rma.uni'.")
   }
+
+  logIN <- log
+
+  # check proper usage of argument 'prior.hyp.conf' and 'prior.hyp.explo'
+  if(!is.null(prior.hyp.conf)){
+    prior.hyp <- prior.hyp.conf
+  }
+  prior.hyp.explo <- process.prior.hyp.explo(prior_hyp_explo = prior.hyp.explo, model = x)
 
   ### Extract effect sizes and sampling variances from the metafor object
   yi <- x$yi
@@ -57,26 +68,29 @@ BF.rma.uni <- function(x,
     logmus <- logmuu + log(post_rho$post_rho_s/(1-prior_rho)) # Likelihood of model delta unconstrained and rho < 0
 
     #get unconstrained estimates
-    rhodraws <- post_rho$rhodraws
+    post.draws <- gibbs_unc_marema(yi, vi, rho_min, typ_vi, start_mu = sum(yi*wi)/sum(wi), start_rho = x$I2/100,
+                                   sdstep = .1, burnin = 1e3, iters = 20000)
+    rhodraws <- post.draws[[1]][,2]
+    deltadraws <- post.draws[[1]][,1]
     rhostats <- c(mean(rhodraws),median(rhodraws),quantile(rhodraws,.025),quantile(rhodraws,.975))
-    tau2draws <- rhodraws/(1-rhodraws)*typ_vi # Compute tau2 based on generated I^2-statistic
-    mean_prior_delta <- 0
-    sd_prior_delta <- length(yi)/sum(1/(vi+mean(tau2draws)))
-
-    mean_delta <- unlist(lapply(1:length(tau2draws), function(i){
-      (mean_prior_delta/sd_prior_delta^2+sum(yi/(vi+tau2draws[i])))/
-        (1/sd_prior_delta^2+sum(1/(vi+tau2draws[i])))
-    }))
-
-    sd_delta <- unlist(lapply(1:length(tau2draws), function(i){
-      1/sqrt(1/sd_prior_delta^2+sum(1/(vi+tau2draws[i])))
-    }))
-
-    deltadraws <- rnorm(length(rhodraws),mean=mean_delta,sd=sd_delta)
     deltastats <- c(mean(deltadraws),median(deltadraws),quantile(deltadraws,.025),quantile(deltadraws,.975))
     uncestimates <- t(matrix(c(rhostats,deltastats),ncol=2))
     row.names(uncestimates) <- c("I^2","mu")
     colnames(uncestimates) <- c("mean","median","2.5%","97.5%")
+    # posterior draws for study-specfic effects
+    tau2draws <- typ_vi * rhodraws / (1 - rhodraws)
+    #truncate
+    tau2draws_trunc <- tau2draws[tau2draws > 0]
+    deltadraws_trunc <- deltadraws[tau2draws > 0]
+    numzerotau2 <- sum(tau2draws <= 0)
+    deltadraws_studies <- do.call(cbind,lapply(1:length(vi),function(s){
+      var_s <- 1/(1/vi[s] + 1/tau2draws_trunc)
+      mean_s <- (yi[s]/vi[s] + deltadraws_trunc/tau2draws_trunc) * var_s
+      draws_s <- c(rnorm(length(deltadraws_trunc),mean=mean_s,sd=sqrt(var_s)),rnorm(numzerotau2,mean=yi[s],sd=sqrt(vi[s])))
+      c(draws_s,mean(draws_s),median(draws_s),quantile(draws_s,.025),quantile(draws_s,.975))
+    }))
+    uncestimates <- rbind(uncestimates,t(deltadraws_studies[length(deltadraws)+1:4,]))
+    row.names(uncestimates)[-(1:2)] <- paste0("mu_",1:ncol(deltadraws_studies))
 
     ### Compute posterior probability of mu > 0 and mu < 0
     postdeltapositive <- mean(deltadraws>0)
@@ -84,16 +98,21 @@ BF.rma.uni <- function(x,
     logmsu <- logmuu + log((1-postdeltapositive)/.5)
 
     ### Compute Bayes factors model vs. unconstrained mu and I^2
-    BF0rhoUnc <- exp(logmu0 - logmuu)
-    BF1rhoUnc <- exp(logmus - logmuu)
-    BF2rhoUnc <- exp(logmul - logmuu)
-    BF0deltaUnc <- exp(logm0u - logmuu)
-    BF1deltaUnc <- exp(logmsu - logmuu)
-    BF2deltaUnc <- exp(logmlu - logmuu)
+    BF0rhoUnc <- (logmu0 - logmuu)
+    BF1rhoUnc <- (logmus - logmuu)
+    BF2rhoUnc <- (logmul - logmuu)
+    BF0deltaUnc <- (logm0u - logmuu)
+    BF1deltaUnc <- (logmsu - logmuu)
+    BF2deltaUnc <- (logmlu - logmuu)
 
     BFtu_exploratory <- matrix(c(BF0rhoUnc,BF0deltaUnc,BF1rhoUnc,BF1deltaUnc,BF2rhoUnc,BF2deltaUnc),nrow=2)
-    PHP_exploratory <- BFtu_exploratory / apply(BFtu_exploratory,1,sum)
-    colnames(BFtu_exploratory) <- colnames(PHP_exploratory) <- c("Pr(=0)","Pr(<0)","Pr(>0)")
+    rowmax <- apply(BFtu_exploratory,1,max)
+    norm_BF_explo <- exp(BFtu_exploratory - rowmax %*% t(rep(1,ncol(BFtu_exploratory)))) *
+      (rep(1,nrow(BFtu_exploratory)) %*% t(prior.hyp.explo[[1]]))
+
+    PHP_exploratory <- norm_BF_explo / apply(norm_BF_explo,1,sum)
+    colnames(BFtu_exploratory) <- c("=0","<0",">0")
+    colnames(PHP_exploratory) <- c("Pr(=0)","Pr(<0)","Pr(>0)")
     row.names(BFtu_exploratory) <- row.names(PHP_exploratory) <- c("I^2","mu")
     BFtu_confirmatory <- PHP_confirmatory <- BFmatrix_confirmatory <- BFtable <-
       priorprobs <- hypotheses <- estimates <- NULL
@@ -131,7 +150,7 @@ BF.rma.uni <- function(x,
                        typ_vi = typ_vi)
 
     mean_prior_delta <- 0
-    sd_prior_delta <- length(yi)/sum(1/vi)
+    sd_prior_delta <- sqrt(length(yi)/sum(1/vi))
 
     mean_delta <- (mean_prior_delta/sd_prior_delta^2+sum(yi/vi))/
       (1/sd_prior_delta^2+sum(1/vi))
@@ -151,17 +170,25 @@ BF.rma.uni <- function(x,
     logms <- logmu0 + log((1-postdeltapositive)/.5)
 
     ### Compute Bayes factors model vs. unconstrained mu
-    BF0delta <- exp(logmu - logmu0)
-    BF1delta <- exp(logms - logmu0)
-    BF2delta <- exp(logml - logmu0)
+    BF0delta <- (logmu - logmu0)
+    BF1delta <- (logms - logmu0)
+    BF2delta <- (logml - logmu0)
 
     BFtu_exploratory <- matrix(c(BF0delta,BF1delta,BF2delta),nrow=1)
-    PHP_exploratory <- BFtu_exploratory / apply(BFtu_exploratory,1,sum)
-    colnames(BFtu_exploratory) <- colnames(PHP_exploratory) <- c("Pr(=0)","Pr(<0)","Pr(>0)")
+    rowmax <- apply(BFtu_exploratory,1,max)
+    norm_BF_explo <- exp(BFtu_exploratory - rowmax %*% t(rep(1,ncol(BFtu_exploratory)))) *
+      (rep(1,nrow(BFtu_exploratory)) %*% t(prior.hyp.explo[[1]]))
+    PHP_exploratory <- norm_BF_explo / apply(norm_BF_explo,1,sum)
+    colnames(PHP_exploratory) <- c("Pr(=0)","Pr(<0)","Pr(>0)")
+    colnames(BFtu_exploratory) <- c("H(=0)","H(<0)","H(>0)")
     row.names(BFtu_exploratory) <- row.names(PHP_exploratory) <- "mu"
     BFtu_confirmatory <- PHP_confirmatory <- BFmatrix_confirmatory <- BFtable <-
       priorprobs <- hypotheses <- estimates <- NULL
 
+  }
+
+  if(logIN==FALSE){
+    BFtu_exploratory <- exp(BFtu_exploratory)
   }
 
   ############################
@@ -173,12 +200,14 @@ BF.rma.uni <- function(x,
     PHP_confirmatory=PHP_confirmatory,
     BFmatrix_confirmatory=BFmatrix_confirmatory,
     BFtable_confirmatory=BFtable,
-    prior.hyp=priorprobs,
+    prior.hyp.explo=prior.hyp.explo,
+    prior.hyp.conf=priorprobs,
     hypotheses=hypotheses,
     estimates=uncestimates,
     model=x,
     bayesfactor="Bayes factor using uniform prior for icc & unit information prior for effect",
     parameter="between-study heterogeneity & effect size",
+    log=logIN,
     call=match.call()
     #rhodraws = rhodraws,
     #deltadraws = deltadraws,
@@ -199,7 +228,7 @@ BF.rma.uni <- function(x,
 ### FUNCTIONS ###
 #################
 
-### Likelihood where delta is integrated out. JORIS: I made some changes in this to make it more efficient.
+### Likelihood where delta is integrated out.
 marg_lik <- function(yi, vi, rho, rho_min, typ_vi)
 {
   tau2 <- rho/(1-rho)*typ_vi # Compute tau2 based on rho
@@ -440,3 +469,105 @@ get_condpost_rho <- function(yi, vi, rho_min, typ_vi, start_rho, iters = 20000)
 
   return(list(rhodraws = rho_s, logm0u = logm0u))
 }
+
+
+#unconstrained sampling using flat prior for delta and prior uniform for rho
+gibbs_unc_marema <- function(yi, vi, rho_min, typ_vi, start_mu, start_rho, sdstep = .1, burnin = 1e3,
+                             iters = 20000){
+
+  #check sd for random walk every 100 iterations
+  check1 <- 100
+  upper1 <- .5 # define region where the sdstep does not have to be changed
+  lower1 <- .15
+  sdsteptel <- 1
+
+  #initialization
+  mu <- start_mu
+  acceptMat <- rep(0, length = iters + burnin)
+  sdstepseq <- rep(0, length = (iters + burnin) / check1)
+  store <- matrix(NA,ncol=2,nrow = iters)
+  colnames(store) <- c("mu","rho")
+  rho <- start_rho
+
+  for(i in 1:burnin){
+    #draw rho
+    #draw candidate from truncated normal
+    rho_star <- rtnorm(1, mean = rho, sd = sdstep, a = rho_min, b = 1)
+
+    #evaluate Metropolis-Hastings acceptance probability
+    cur_vars <- vi+typ_vi*rho/(1-rho)
+    can_vars <- vi+typ_vi*rho_star/(1-rho_star)
+
+    R_MH <- exp( sum(dnorm(yi,mean=mu,sd=sqrt(can_vars),log=TRUE)) -
+                   sum(dnorm(yi,mean=mu,sd=sqrt(cur_vars),log=TRUE)) ) *
+      (pnorm(1,mean=rho,sd=sdstep) - pnorm(rho_min,mean=rho,sd=sdstep)) /
+      (pnorm(1,mean=rho_star,sd=sdstep) - pnorm(rho_min,mean=rho_star,sd=sdstep))
+    rho <- ifelse(runif(1) < R_MH, rho_star, rho)
+    acceptMat[i] <- rho_star == rho
+
+    #draw mu
+    varmu <- 1/sum(1/(vi+typ_vi*rho/(1-rho)))
+    meanmu <- sum(yi/(vi+typ_vi*rho/(1-rho)))/sum(1/(vi+typ_vi*rho/(1-rho)))
+    mu <- rnorm(1,mean=meanmu,sd=sqrt(varmu))
+
+    #if needed update random walk sd depending on acceptance rate
+    if(ceiling(i/check1)==i/check1){
+      probs <- mean(acceptMat[(i-check1+1):i])
+      if(probs>upper1){
+        sdstep <- sdstep * ( (probs-upper1)/(1-upper1) + 1)
+      }else if(probs < lower1){
+        sdstep <- sdstep * 1 / ( 2 - probs/lower1 )
+      }
+      sdstep <- ifelse(sdstep > 1,1,sdstep)
+      sdstepseq[sdsteptel] <- sdstep
+      sdsteptel <- sdsteptel + 1
+    }
+
+  }
+
+  #now actual drawing
+  for(i in 1:iters){
+    #draw rho
+    #draw candidate from truncated normal
+    rho_star <- rtnorm(1, mean = rho, sd = sdstep, a = rho_min, b = 1)
+
+    #evaluate Metropolis-Hastings acceptance probability
+    cur_vars <- vi+typ_vi*rho/(1-rho)
+    can_vars <- vi+typ_vi*rho_star/(1-rho_star)
+
+    R_MH <- exp( sum(dnorm(yi,mean=mu,sd=sqrt(can_vars),log=TRUE)) -
+                   sum(dnorm(yi,mean=mu,sd=sqrt(cur_vars),log=TRUE)) ) *
+      (pnorm(1,mean=rho,sd=sdstep) - pnorm(rho_min,mean=rho,sd=sdstep)) /
+      (pnorm(1,mean=rho_star,sd=sdstep) - pnorm(rho_min,mean=rho_star,sd=sdstep))
+    rho <- ifelse(runif(1) < R_MH, rho_star, rho)
+    acceptMat[i] <- rho_star == rho
+
+    #draw mu
+    varmu <- 1/sum(1/(vi+typ_vi*rho/(1-rho)))
+    meanmu <- sum(yi/(vi+typ_vi*rho/(1-rho)))/sum(1/(vi+typ_vi*rho/(1-rho)))
+    mu <- rnorm(1,mean=meanmu,sd=sqrt(varmu))
+
+    #if needed update random walk sd depending on acceptance rate
+    if(ceiling(i/check1)==i/check1){
+      probs <- mean(acceptMat[(i-check1+1):i])
+      if(probs>upper1){
+        sdstep <- sdstep * ( (probs-upper1)/(1-upper1) + 1)
+      }else if(probs < lower1){
+        sdstep <- sdstep * 1 / ( 2 - probs/lower1 )
+      }
+      sdstep <- ifelse(sdstep > 1,1,sdstep)
+      sdstepseq[sdsteptel] <- sdstep
+      sdsteptel <- sdsteptel + 1
+    }
+
+    store[i,] <- c(mu,rho)
+
+  }
+
+  return(list(postdraws = store))
+
+}
+
+
+
+
