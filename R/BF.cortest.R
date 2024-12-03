@@ -48,10 +48,25 @@ BF.cor_test <- function(x,
                         prior.hyp = NULL,
                         complement = TRUE,
                         log = FALSE,
+                        cov.prob = .95,
                         ...){
 
-  bayesfactor <- "Bayes factors based on joint uniform priors"
+  if(x$prior.cor == "joint.unif"){
+    bayesfactor <- "Bayes factors based on joint uniform priors"
+  }
+  if(x$prior.cor == "marg.unif"){
+    bayesfactor <- "Bayes factors based on marginally uniform priors"
+  }
+  if( !(x$prior.cor == "marg.unif" | x$prior.cor == "joint.unif") ){
+    stop("argument 'prior' of cor_test object should be 'joint.unif' or 'marg.unif'. See ?cor_test")
+  }
   testedparameter <- "correlation coefficients"
+
+  if(!(cov.prob>0 & cov.prob<1)){
+    stop("The argument 'cov.prob' is a coverage probability for the interval estimates that should lie between 0 and 1. The default is 0.95.")
+  }
+  CrI_LB <- (1 - cov.prob)/2
+  CrI_UB <- 1 - (1 - cov.prob)/2
 
   logIN <- log
 
@@ -88,7 +103,12 @@ BF.cor_test <- function(x,
       approx_studt[1] <- P * slpe1 + intcept1
     }
   }
-  relcomp0 <- dt(0,df=approx_studt[1],log=TRUE)-log(approx_studt[2]) # all marginal priors are the same
+  if(x$prior.cor == "joint.unif"){
+    relcomp0 <- dt(0,df=approx_studt[1],log=TRUE)-log(approx_studt[2]) # all marginal priors are the same
+  }
+  if(x$prior.cor == "marg.unif"){
+    relcomp0 <- dt(0,df=Fcor[1,1],log=TRUE)-log(Fcor[1,2]) #Fisher transformed height for a uniform(-1,1) prior
+  }
 
   # compute exploratory BFs
   corr_names <- rownames(x$correstimates)
@@ -107,8 +127,23 @@ BF.cor_test <- function(x,
     (rep(1,nrow(BFtu_exploratory)) %*% t(prior.hyp.explo[[1]]))
   PHP_exploratory <- norm_BF_explo / apply(norm_BF_explo,1,sum)
   colnames(PHP_exploratory) <- c("P(=0)","P(<0)","P(>0)")
+
   # posterior estimates
-  postestimates <- x$correstimates
+  postestimates_correlations <- Reduce(rbind,
+                                       lapply(1:numG,function(g){
+                                         draws_stack_g <- as.matrix(do.call(cbind,lapply(1:P,function(p){x$corrdraws[[g]][,,p]}))[,which(c(lower.tri(diag(P))))])
+                                         means <- apply(draws_stack_g,2,mean)
+                                         medians <- apply(draws_stack_g,2,median)
+                                         lb <- apply(draws_stack_g,2,quantile,CrI_LB)
+                                         ub <- apply(draws_stack_g,2,quantile,CrI_UB)
+                                         rm(draws_stack_g)
+                                         return(cbind(means,medians,lb,ub))
+                                       }))
+
+  colnames(postestimates_correlations) <- c("mean","median",paste0(as.character(round(CrI_LB*100,7)),"%"),
+                                            paste0(as.character(round(CrI_UB*100,7)),"%"))
+  postestimates <- postestimates_correlations
+  rownames(postestimates) <- corr_names
 
   if(logIN == FALSE){
     BFtu_exploratory <- exp(BFtu_exploratory)
@@ -116,118 +151,126 @@ BF.cor_test <- function(x,
 
   # confirmatory testing if hypothesis argument is used
   if(!is.null(hypothesis)){
-
-    #check if constraints are formulated on correlations in different populations
-    #if so, then the correlation names contains the string "_in_g" at the end
-    params_in_hyp1 <- params_in_hyp(hypothesis)
-
-    corr_names <- unlist(lapply(1:length(x$corrnames),function(g){
-      c(x$corrnames[[g]][lower.tri(x$corrnames[[g]])],
-        t(x$corrnames[[g]])[lower.tri(x$corrnames[[g]])])
-    })) #which includes Y1_with_Y2 and Y2_with_Y1
-
-    parse_hyp <- parse_hypothesis(corr_names,hypothesis)
-    parse_hyp$hyp_mat <- do.call(rbind, parse_hyp$hyp_mat)
-    if(nrow(parse_hyp$hyp_mat)==1){
-      select1 <- rep(1:numcorrgroup,numG) + rep((0:(numG-1))*2*numcorrgroup,each=numcorrgroup)
-      select2 <- rep(numcorrgroup+1:numcorrgroup,numG) + rep((0:(numG-1))*2*numcorrgroup,each=numcorrgroup)
-      parse_hyp$hyp_mat <-
-        t(as.matrix(c(parse_hyp$hyp_mat[,select1] + parse_hyp$hyp_mat[,select2],parse_hyp$hyp_mat[,numcorrgroup*2*numG+1])))
+    if(x$prior.cor != "joint.unif"){
+      BFtu_confirmatory <- PHP_confirmatory <- BFmatrix_confirmatory <- relfit <-
+        relcomp <- hypotheses <- BFtable <- priorprobs <- NULL
+      warning(
+        "The 'hypothesis' argument not used. No manual hypothesis test is supported when the prior of the
+correlation matrix is marginally uniform. Set the 'prior.cor' argument in cor_test() to 'joint.unif'
+for manual hypothesis testing (Mulder and Gelissen, 2023).")
     }else{
-      #combine equivalent correlations, e.g., cor(Y1,Y2)=corr(Y2,Y1).
-      select1 <- rep(1:numcorrgroup,numG) + rep((0:(numG-1))*2*numcorrgroup,each=numcorrgroup)
-      select2 <- rep(numcorrgroup+1:numcorrgroup,numG) + rep((0:(numG-1))*2*numcorrgroup,each=numcorrgroup)
-      parse_hyp$hyp_mat <-
-        cbind(parse_hyp$hyp_mat[,select1] + parse_hyp$hyp_mat[,select2],parse_hyp$hyp_mat[,numcorrgroup*2*numG+1])
-    }
-    #create coefficient with equality and order constraints
-    RrList <- make_RrList2(parse_hyp)
-    RrE <- RrList[[1]]
-    RrO <- RrList[[2]]
-    numhyp <- length(RrE)
-    #Fisher transform constants in constraints
-    for(h in 1:numhyp){
-      if(!is.null(RrE[[h]])){
-        RrE[[h]][,ncol(RrE[[h]])] <- FisherZ(RrE[[h]][,ncol(RrE[[h]])])
-      }
-      if(!is.null(RrO[[h]])){
-        RrO[[h]][,ncol(RrO[[h]])] <- FisherZ(RrO[[h]][,ncol(RrO[[h]])])
-      }
-    }
 
-    relfit <- t(matrix(unlist(lapply(1:numhyp,function(h){
-      Gaussian_measures(corrmeanN,corrcovmN,RrE1=RrE[[h]],RrO1=RrO[[h]])
-    })),nrow=2))
-    #names1 and constraints1 ... to fix ...
-    # approximate unconstrained Fisher transformed correlations with a multivariate Student t
-    if(numcorrgroup==1){
-      if(numcorr==1){
-        Scale0 <- as.matrix(approx_studt[2]**2)
+      #check if constraints are formulated on correlations in different populations
+      #if so, then the correlation names contains the string "_in_g" at the end
+      params_in_hyp1 <- params_in_hyp(hypothesis)
+
+      corr_names <- unlist(lapply(1:length(x$corrnames),function(g){
+        c(x$corrnames[[g]][lower.tri(x$corrnames[[g]])],
+          t(x$corrnames[[g]])[lower.tri(x$corrnames[[g]])])
+      })) #which includes Y1_with_Y2 and Y2_with_Y1
+
+      parse_hyp <- parse_hypothesis(corr_names,hypothesis)
+      parse_hyp$hyp_mat <- do.call(rbind, parse_hyp$hyp_mat)
+      if(nrow(parse_hyp$hyp_mat)==1){
+        select1 <- rep(1:numcorrgroup,numG) + rep((0:(numG-1))*2*numcorrgroup,each=numcorrgroup)
+        select2 <- rep(numcorrgroup+1:numcorrgroup,numG) + rep((0:(numG-1))*2*numcorrgroup,each=numcorrgroup)
+        parse_hyp$hyp_mat <-
+          t(as.matrix(c(parse_hyp$hyp_mat[,select1] + parse_hyp$hyp_mat[,select2],parse_hyp$hyp_mat[,numcorrgroup*2*numG+1])))
       }else{
-        Scale0 <- diag(rep(approx_studt[2]**2,numG))
+        #combine equivalent correlations, e.g., cor(Y1,Y2)=corr(Y2,Y1).
+        select1 <- rep(1:numcorrgroup,numG) + rep((0:(numG-1))*2*numcorrgroup,each=numcorrgroup)
+        select2 <- rep(numcorrgroup+1:numcorrgroup,numG) + rep((0:(numG-1))*2*numcorrgroup,each=numcorrgroup)
+        parse_hyp$hyp_mat <-
+          cbind(parse_hyp$hyp_mat[,select1] + parse_hyp$hyp_mat[,select2],parse_hyp$hyp_mat[,numcorrgroup*2*numG+1])
       }
-      mean0 <- rep(0,numG)
-      df0 <- round(approx_studt[1])
-    }else{
-      mean0 <- rep(0,numcorrgroup*numG)
-      Scale0 <- diag(rep(approx_studt[2]**2,numcorrgroup*numG))
-      df0 <- round(approx_studt[1])
-    }
-    relcomp <- t(matrix(unlist(lapply(1:numhyp,function(h){
-      relcomp_h <- Student_measures(mean1=mean0,
-                                    Scale1=Scale0,
-                                    df1=df0,
-                                    RrE1=RrE[[h]],
-                                    RrO1=RrO[[h]])
-      return(relcomp_h)
+      #create coefficient with equality and order constraints
+      RrList <- make_RrList2(parse_hyp)
+      RrE <- RrList[[1]]
+      RrO <- RrList[[2]]
+      numhyp <- length(RrE)
+      #Fisher transform constants in constraints
+      for(h in 1:numhyp){
+        if(!is.null(RrE[[h]])){
+          RrE[[h]][,ncol(RrE[[h]])] <- FisherZ(RrE[[h]][,ncol(RrE[[h]])])
+        }
+        if(!is.null(RrO[[h]])){
+          RrO[[h]][,ncol(RrO[[h]])] <- FisherZ(RrO[[h]][,ncol(RrO[[h]])])
+        }
+      }
 
-    })),nrow=2))
+      relfit <- t(matrix(unlist(lapply(1:numhyp,function(h){
+        Gaussian_measures(corrmeanN,corrcovmN,RrE1=RrE[[h]],RrO1=RrO[[h]])
+      })),nrow=2))
+      #names1 and constraints1 ... to fix ...
+      # approximate unconstrained Fisher transformed correlations with a multivariate Student t
+      if(numcorrgroup==1){
+        if(numcorr==1){
+          Scale0 <- as.matrix(approx_studt[2]**2)
+        }else{
+          Scale0 <- diag(rep(approx_studt[2]**2,numG))
+        }
+        mean0 <- rep(0,numG)
+        df0 <- round(approx_studt[1])
+      }else{
+        mean0 <- rep(0,numcorrgroup*numG)
+        Scale0 <- diag(rep(approx_studt[2]**2,numcorrgroup*numG))
+        df0 <- round(approx_studt[1])
+      }
+      relcomp <- t(matrix(unlist(lapply(1:numhyp,function(h){
+        relcomp_h <- Student_measures(mean1=mean0,
+                                      Scale1=Scale0,
+                                      df1=df0,
+                                      RrE1=RrE[[h]],
+                                      RrO1=RrO[[h]])
+        return(relcomp_h)
 
-    row.names(relfit) <- row.names(relcomp) <- parse_hyp$original_hypothesis
-    if(complement == TRUE){
-      relfit <- Gaussian_prob_Hc(corrmeanN,corrcovmN,relfit,RrO)
-      relcomp <- Student_prob_Hc(mean1=mean0,scale1=Scale0,df1=df0,relmeas1=relcomp,
-                                 constraints=NULL,RrO1=RrO)
-    }
-    hypothesisshort <- unlist(lapply(1:nrow(relfit),function(h) paste0("H",as.character(h))))
-    row.names(relfit) <- row.names(relfit) <- hypothesisshort
+      })),nrow=2))
 
-    # the BF for the complement hypothesis vs Hu needs to be computed.
-    BFtu_confirmatory <- c(apply(relfit - relcomp, 1, sum))
-    # Check input of prior probabilies
-    if(is.null(prior.hyp)){
-      priorprobs <- rep(1/length(BFtu_confirmatory),length(BFtu_confirmatory))
-    }else{
-      if(!is.numeric(prior.hyp) || length(prior.hyp)!=length(BFtu_confirmatory)){
-        warning(paste0("Argument 'prior.hyp' should be numeric and of length ",as.character(length(BFtu_confirmatory)),". Equal prior probabilities are used."))
+      row.names(relfit) <- row.names(relcomp) <- parse_hyp$original_hypothesis
+      if(complement == TRUE){
+        relfit <- Gaussian_prob_Hc(corrmeanN,corrcovmN,relfit,RrO)
+        relcomp <- Student_prob_Hc(mean1=mean0,scale1=Scale0,df1=df0,relmeas1=relcomp,
+                                   constraints=NULL,RrO1=RrO)
+      }
+      hypothesisshort <- unlist(lapply(1:nrow(relfit),function(h) paste0("H",as.character(h))))
+      row.names(relfit) <- row.names(relfit) <- hypothesisshort
+
+      # the BF for the complement hypothesis vs Hu needs to be computed.
+      BFtu_confirmatory <- c(apply(relfit - relcomp, 1, sum))
+      # Check input of prior probabilies
+      if(is.null(prior.hyp)){
         priorprobs <- rep(1/length(BFtu_confirmatory),length(BFtu_confirmatory))
       }else{
-        priorprobs <- prior.hyp
+        if(!is.numeric(prior.hyp) || length(prior.hyp)!=length(BFtu_confirmatory)){
+          warning(paste0("Argument 'prior.hyp' should be numeric and of length ",as.character(length(BFtu_confirmatory)),". Equal prior probabilities are used."))
+          priorprobs <- rep(1/length(BFtu_confirmatory),length(BFtu_confirmatory))
+        }else{
+          priorprobs <- prior.hyp
+        }
+      }
+      names(priorprobs) <- names(BFtu_confirmatory)
+      maxBFtu <- max(BFtu_confirmatory)
+      PHP_confirmatory <- exp(BFtu_confirmatory-maxBFtu)*priorprobs / sum(exp(BFtu_confirmatory-maxBFtu)*priorprobs)
+      BFtable <- cbind(relcomp,relfit,relfit[,1]-relcomp[,1],relfit[,2]-relcomp[,2],
+                       apply(relfit,1,sum)-apply(relcomp,1,sum),PHP_confirmatory)
+      BFtable[,1:7] <- exp(BFtable[,1:7])
+      row.names(BFtable) <- names(BFtu_confirmatory)
+      colnames(BFtable) <- c("complex=","complex>","fit=","fit>","BF=","BF>","BF","PHP")
+      BFmatrix_confirmatory <- matrix(rep(BFtu_confirmatory,length(BFtu_confirmatory)),ncol=length(BFtu_confirmatory))-
+        t(matrix(rep(BFtu_confirmatory,length(BFtu_confirmatory)),ncol=length(BFtu_confirmatory)))
+      diag(BFmatrix_confirmatory) <- 0
+      row.names(BFmatrix_confirmatory) <- colnames(BFmatrix_confirmatory) <- names(BFtu_confirmatory)
+      if(nrow(relfit)==length(parse_hyp$original_hypothesis)){
+        hypotheses <- parse_hyp$original_hypothesis
+      }else{
+        hypotheses <- c(parse_hyp$original_hypothesis,"complement")
+      }
+
+      if(logIN == FALSE){
+        BFtu_confirmatory <- exp(BFtu_confirmatory)
+        BFmatrix_confirmatory <- exp(BFmatrix_confirmatory)
       }
     }
-    names(priorprobs) <- names(BFtu_confirmatory)
-    maxBFtu <- max(BFtu_confirmatory)
-    PHP_confirmatory <- exp(BFtu_confirmatory-maxBFtu)*priorprobs / sum(exp(BFtu_confirmatory-maxBFtu)*priorprobs)
-    BFtable <- cbind(relcomp,relfit,relfit[,1]-relcomp[,1],relfit[,2]-relcomp[,2],
-                     apply(relfit,1,sum)-apply(relcomp,1,sum),PHP_confirmatory)
-    BFtable[,1:7] <- exp(BFtable[,1:7])
-    row.names(BFtable) <- names(BFtu_confirmatory)
-    colnames(BFtable) <- c("complex=","complex>","fit=","fit>","BF=","BF>","BF","PHP")
-    BFmatrix_confirmatory <- matrix(rep(BFtu_confirmatory,length(BFtu_confirmatory)),ncol=length(BFtu_confirmatory))-
-      t(matrix(rep(BFtu_confirmatory,length(BFtu_confirmatory)),ncol=length(BFtu_confirmatory)))
-    diag(BFmatrix_confirmatory) <- 0
-    row.names(BFmatrix_confirmatory) <- colnames(BFmatrix_confirmatory) <- names(BFtu_confirmatory)
-    if(nrow(relfit)==length(parse_hyp$original_hypothesis)){
-      hypotheses <- parse_hyp$original_hypothesis
-    }else{
-      hypotheses <- c(parse_hyp$original_hypothesis,"complement")
-    }
-
-    if(logIN == FALSE){
-      BFtu_confirmatory <- exp(BFtu_confirmatory)
-      BFmatrix_confirmatory <- exp(BFmatrix_confirmatory)
-    }
-
   }else{
     BFtu_confirmatory <- PHP_confirmatory <- BFmatrix_confirmatory <- relfit <-
       relcomp <- hypotheses <- BFtable <- priorprobs <- NULL
@@ -276,12 +319,12 @@ draw_ju_r <- function(P, samsize=50000, Fisher=1){
 }
 
 
-
 #' @title Bayesian correlation analysis
 #'
 #' @name cor_test
 #'
-#' @description Estimate the unconstrained posterior for the correlations using a joint uniform prior.
+#' @description Estimate the unconstrained posterior for the correlations using a joint uniform prior (Mulder and Gelissen,
+#' 2023) or a marginally uniform prior (Barnard et al., 2000, Mulder, 2016).
 #'
 #' @param ...  matrices (or data frames) of dimensions \emph{n} (observations) by  \emph{p} (variables)
 #' for different groups (in case of multiple matrices or data frames).
@@ -293,8 +336,10 @@ draw_ju_r <- function(P, samsize=50000, Fisher=1){
 #'
 #' @param burnin number of iterations for burnin (default is 3000).
 #'
-#' @param nugget.scale a scalar which serves to avoid violations of positive definite correlation matrices.
-#' It should be very close to 1 (the default is .995).
+#' @param nugget.scale a scalar to avoid computational issues due to posterior draws for the corralations
+#' too close to 1 in absolute value. Posterior draws for the correlations are multiplied with this nugget.scale.
+#' So \code{nugget.scale} should be close to 1 (the default is .999). If the traceplots show that draws are stuck
+#' at 1 or -1 too long try a slightly smaller \code{nugget.scale}.
 #'
 #' @return list of class \code{cor_test}:
 #' \itemize{
@@ -305,44 +350,68 @@ draw_ju_r <- function(P, samsize=50000, Fisher=1){
 #' \item \code{corrnames} names of all correlations
 #' }
 #'
+#' @references Mulder, J., & Gelissen, J. P. (2023). Bayes factor testing of equality and order constraints on measures of
+#' association in social research. Journal of Applied Statistics, 50(2), 315-351. <https://doi.org/10.1080/02664763.2021.1992360>
+#'
+#' @references Mulder, J. (2016). Bayes factors for testing order-constrained hypotheses on correlations. Journal of Mathematical
+#' Psychology, 72, 104-115. <https://doi.org/10.1016/j.jmp.2014.09.004>
+#'
+#' @references Barnard, J., McCulloch, R., & Meng, X. L. (2000). Modeling covariance matrices in terms of standard deviations and
+#' correlations, with application to shrinkage. Statistica Sinica, 1281-1311. <https://www.jstor.org/stable/24306780>
+#'
+#' @references Joe. Generating random correlation matrices based on partial correlations, Journal of Multivariate Analysis,
+#' 97(10), 2177-2189. <https://doi.org/10.1016/j.jmva.2005.05.010>
+#'
 #' @examples
 #' \donttest{
 #' # Bayesian correlation analysis of the 6 variables in 'memory' object
 #' # we consider a correlation analysis of the first three variable of the memory data.
-#' #fit <- cor_test(BFpack::memory[,1:3])
+#' fit <- cor_test(BFpack::memory[,1:3])
 #'
 #' # Bayesian correlation of variables in memory object in BFpack while controlling
 #' # for the Cat variable
-#' #fit <- cor_test(BFpack::memory[,c(1:4)],formula = ~ Cat)
+#' fit <- cor_test(BFpack::memory[,c(1:4)],formula = ~ Cat)
 #'
 #' # Example of Bayesian estimation of polyserial correlations
-#' #memory_example <- memory[,c("Im","Rat")]
-#' #memory_example$Rat <- as.ordered(memory_example$Rat)
-#' #fit <- cor_test(memory_example)
+#' memory_example <- memory[,c("Im","Rat")]
+#' memory_example$Rat <- as.ordered(memory_example$Rat)
+#' fit <- cor_test(memory_example)
 #'
 #' # Bayesian correlation analysis of first three variables in memory data
 #' # for two different groups
-#' #HC <- subset(BFpack::memory[,c(1:3,7)], Group == "HC")[,-4]
-#' #SZ <- subset(BFpack::memory[,c(1:3,7)], Group == "SZ")[,-4]
-#' #fit <- cor_test(HC,SZ)
+#' HC <- subset(BFpack::memory[,c(1:3,7)], Group == "HC")[,-4]
+#' SZ <- subset(BFpack::memory[,c(1:3,7)], Group == "SZ")[,-4]
+#' fit <- cor_test(HC,SZ)
 #'
 #' }
 #' @rdname cor_test
 #' @export
 cor_test <- function(..., formula = NULL, iter = 5e3, burnin = 3e3, nugget.scale = .995){
 
+  prior.cor <- "joint.unif"
+
+  if(is.na(prior.cor)){stop("'prior.cor' argument needs to be either 'joint.unif' or 'marg.unif'. See ?cor_test.")}
+  if(is.null(prior.cor)){stop("'prior.cor' argument needs to be either 'joint.unif' or 'marg.unif'. See ?cor_test.")}
+  if(!(prior.cor == "joint.unif" | prior.cor == "marg.unif")){
+    stop("'prior.cor' argument needs to be either 'joint.unif' or 'marg.unif'. See ?cor_test.")}
+  if(prior.cor == "joint.unif"){
+    priorchoice <- 1
+  }else{
+    priorchoice <- 2
+  }
+
   if(!is.numeric(nugget.scale)){stop("'nugget.scale' should be a numerical scalar.")}
   if(nugget.scale > 1 | nugget.scale < 0){stop("'nugget.scale' should be very close 1. If should not exceed 1 nor fall below 0.")}
   nugget.scale <- nugget.scale[1]
 
-  Y_groups <- list(...)
-  numG <- length(Y_groups)
+  Y_input <- list(...)
+  numG <- length(Y_input)
 
   if(is.null(formula)){
     formula <- ~ 1
   }
   Xnames <- attr(terms(formula), "term.labels")
-  whichDV <- lapply(Y_groups,function(y){
+  whichDV <- lapply(Y_input,function(y){
     unlist(lapply(colnames(y),function(x){sum(x==Xnames)==0}))
   })
   if(numG>1){ #check that the same number of DVs are present in each group (that's how dimensions are coded)
@@ -355,19 +424,24 @@ cor_test <- function(..., formula = NULL, iter = 5e3, burnin = 3e3, nugget.scale
     }
   }
 
-  #check measurement level of dependent variables, and convert to numericals (whichDV)
+  #check measurement level of dependent variables
   P <- sum(whichDV[[1]])
   ordi <- numcats <- matrix(0,nrow=numG,ncol=P)
   Ylevel <- matrix(0,nrow=numG,ncol=P)
-  teller <- 1
+  Y_groups <- Y_input
   for(gg in 1:numG){
+    teller <- 1
     for(pp in which(whichDV[[gg]])){
       if(class(Y_groups[[gg]][,pp])[1] == "numeric" | class(Y_groups[[gg]][,pp])[1] == "integer"){
         teller <- teller + 1
         Ylevel[gg,pp] <- "numeric"
       }else{
         if(class(Y_groups[[gg]][,pp])[1] == "ordered"){
-          levels(Y_groups[[gg]][,pp]) <- 1:length(levels(Y_groups[[gg]][,pp]))
+          #levels(Y_groups[[gg]][,pp]) <- 1:length(levels(Y_groups[[gg]][,pp]))
+          old_levels <- sort(as.numeric(unique(Y_groups[[gg]][,pp])))
+          for(index_levels_g_p in 1:length(old_levels)){
+            Y_groups[[gg]][which(Y_groups[[gg]][,pp] == old_levels[index_levels_g_p]),pp] <- index_levels_g_p
+          }
           Y_groups[[gg]][,pp] <- as.numeric(Y_groups[[gg]][,pp])
           ordi[gg,teller] <- 1
           numcats[gg,teller] <- max(Y_groups[[gg]][,pp])
@@ -531,7 +605,8 @@ cor_test <- function(..., formula = NULL, iter = 5e3, burnin = 3e3, nugget.scale
                   maxCat=as.integer(max(numcats)),
                   gLiuSab=gLiuSab,
                   #seed=as.integer(sample.int(1e6,1)),
-                  nuggetscale=as.double(nugget.scale)
+                  nuggetscale=as.double(nugget.scale),
+                  priorchoice = as.integer(priorchoice)
                   #,WgroupsStore=array(as.double(0),dim=c(samsize0,numG,Ntot,P)),
                   #meanMatMeanStore = array(as.double(0),dim=c(samsize0,Ntot,P)),
                   #SigmaMatDrawStore = array(as.double(0),dim=c(samsize0,P,P)),
@@ -606,7 +681,7 @@ cor_test <- function(..., formula = NULL, iter = 5e3, burnin = 3e3, nugget.scale
 
   cor_out <- list(meanF=meanN,covmF=covmN,correstimates=postestimates_correlations,
                   corrdraws=corrdraws,corrnames=corrnames,variables=varnames,
-                  cor.type=cor.type,res=res)
+                  cor.type=cor.type,res=res,prior.cor=prior.cor)
   class(cor_out) <- "cor_test"
 
   return(cor_out)

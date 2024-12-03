@@ -173,8 +173,13 @@ BF.mvt_test <- function(x,
                         prior.hyp = NULL,
                         complement = TRUE,
                         log = FALSE,
-                        BF.type = 2,
+                        cov.prob = .95,
+                        BF.type = NULL,
                         ...) {
+
+  if(!(cov.prob>0 & cov.prob<1)){
+    stop("The argument 'cov.prob' is a coverage probability for the interval estimates that should lie between 0 and 1. The default is 0.95.")
+  }
 
   if(x$numpop==1 & x$paired==FALSE){
     parameters <- "means"
@@ -201,6 +206,7 @@ BF.mvt_test <- function(x,
                  hypothesis=hypothesis.explo,
                  prior.hyp.conf=prior.hyp.explo,
                  log=log,
+                 cov.prob=cov.prob,
                  BF.type=BF.type)
   BF.explo$BFtu_confirmatory <- t(as.matrix(BF.explo$BFtu_confirmatory))
   BF.explo$PHP_confirmatory <- t(as.matrix(BF.explo$PHP_confirmatory))
@@ -238,6 +244,14 @@ BF.mvt_test <- function(x,
     BF.conf$hypotheses <- gsub(add.name,rem.name,BF.conf$hypotheses)
   }
 
+  BF.explo_estimates <- BF.explo$estimates
+  if(x$numpop == 1){
+    row.names(BF.explo_estimates) <- names(get_estimates(x)$estimate)
+  }else{
+    BF.explo_estimates <- BF.explo_estimates[(1:P)*2,]
+    row.names(BF.explo_estimates) <- names(get_estimates(x)$estimate)
+  }
+
   BFlm_out <- list(
     BFtu_exploratory=BF.explo$BFtu_confirmatory,
     PHP_exploratory=BF.explo$PHP_confirmatory,
@@ -248,13 +262,14 @@ BF.mvt_test <- function(x,
     prior.hyp.explo=BF.explo$prior.hyp.conf,
     prior.hyp.conf=BF.conf$prior.hyp.conf,
     hypotheses=BF.conf$hypotheses,
-    estimates=BF.conf$estimates,
+    estimates=BF.explo_estimates,
     model=x1,
     bayesfactor=BF.conf$bayesfactor,
     parameter=parameters,
     log = BF.conf$log,
     fraction_number_groupIDs = BF.conf$fraction_number_groupIDs,
     fraction_groupID_observations = BF.conf$fraction_groupID_observations,
+    fraction_groupID = BF.conf$fraction_groupID,
     call=match.call())
 
   class(BFlm_out) <- "BF"

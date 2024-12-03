@@ -2,7 +2,15 @@
 # exploratory testing correlations in multivariate normal model
 set.seed(123)
 cor1 <- cor_test(mtcars[,4:6],iter = 1e3,burnin = 0)
-BF1 <- BF(cor1)
+BF1 <- BF(cor1,prior.hyp.explo = c(1,1,1),cov.prob=.99)
+test_that("BF.cor_test use of cov.prob argument", {
+  expect_equivalent(
+    colnames(BF1$estimates)[3],"0.5%"
+  )
+  expect_equivalent(
+    BF1$estimates[1,3],-0.7662987,tol=.05
+  )
+})
 BF1a <- BF(cor1,prior.hyp.explo = 3:5)
 PHPexplo <- matrix(
   c(0.06,  0.94,  0.0,
@@ -39,7 +47,7 @@ test_that("log BF.cor_test confirmatory hypotheses on correlations correctly eva
 # test a single correlation
 set.seed(123)
 cor2 <- cor_test(mtcars[,1:2],burnin=1e2)
-print(cor2)
+#print(cor2)
 BF2 <- BF(cor2,hypothesis="cyl_with_mpg= -.9")
 logBFexplo <- matrix(
   c(-20.6,  .7,  -24.2),nrow=1,byrow=T)
@@ -57,7 +65,7 @@ test_that("BF.cor_test confirmatory hypotheses on correlations correctly evaluat
 # estimate correlations for unequal groups
 set.seed(123)
 cor2b <- cor_test(mtcars[1:10,2:4],mtcars[11:32,2:4])
-print(cor2b)
+#print(cor2b)
 estimates_check <- c(.85,.80,.79,.89,.81,.77)
 test_that("check estimates of correlations of multiple groups", {
   expect_equivalent(
@@ -75,20 +83,19 @@ test_that("BF.cor_test exploratory hypotheses on correlations correctly evaluate
   )})
 
 # test a single correlation on categorical outcomes
-print("test a single correlation on categorical outcomes")
 set.seed(123)
 mtcars_test <- mtcars[,8:9]
 mtcars_test[,2] <- as.factor(mtcars_test[,2])
 mtcars_test[,1] <- as.factor(mtcars_test[,1])
-cor2 <- cor_test(mtcars_test,burnin = 5e2, iter = 3000)
-print(cor2)
+cor2 <- cor_test(mtcars_test,burnin = 5e2, iter = 3000,nugget.scale = .995)
+#print(cor2)
 test_that("check estimate of polychoric correlation", {
   expect_equivalent(
-    round(cor2$correstimates[1,1],2),.28, tolerance = .1
+    round(cor2$correstimates[1,1],2),.39, tolerance = .1
   )})
-BF2 <- BF(cor2,hypothesis="am_with_vs= .1")
+BF2 <- BF(cor2,hypothesis="am_with_vs= .1",prior.hyp.explo = c(1,1,1))
 PHPexplo <- matrix(
-  c(.433,  .096,  .471),nrow=1,byrow=T)
+  c(.4,  .09,  .504),nrow=1,byrow=T)
 # exploratory hypothesis test on the correlation
 test_that("BF.cor_test exploratory hypotheses on correlations correctly evaluated", {
   expect_equivalent(
@@ -107,10 +114,26 @@ mtcars_test[,2] <- as.ordered(mtcars_test[,2])
 mtcars_test[,3] <- as.factor(mtcars_test[,3])
 mtcars_test[,4] <- as.integer(mtcars_test[,4])
 cor4 <- cor_test(mtcars_test,iter = 1e3,burnin = 3e2)
-print(cor4)
+#print(cor4)
 BF4 <- BF(cor4,log = TRUE)
 test_that("BF.cor_test exploratory hypotheses on correlations mixed measurement levels", {
   expect_equivalent(
     round(BF4$BFtu_exploratory[,2],1),c(0.7,-37,-9.5,.7,.7,-11.5), tolerance = .1
   )})
 #
+
+#test ordinal correlations multiple groups
+set.seed(123)
+group1 <- data.frame(cbind(round(runif(20)*2+1),rnorm(20)))
+class(group1$X1) <- "ordered"
+group2 <- data.frame(cbind(round(runif(14)*2+1),rnorm(14)))
+class(group2$X1) <- "ordered"
+cor4 <- cor_test(group1,group2,iter = 1e3,burnin = 3e2)
+test_that("test ordinal correlations multiple groups", {
+  expect_equivalent(
+    round(cor4$meanF,2),c(-0.46,0.30), tolerance = .1
+  )
+})
+
+
+

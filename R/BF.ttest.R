@@ -26,20 +26,27 @@ BF.t_test <- function(x,
                       prior.hyp = NULL,
                       complement = TRUE,
                       log = FALSE,
-                      BF.type = 2,
+                      cov.prob = .95,
+                      BF.type = NULL,
                       iter = 1e6,
                       ...){
+
+  if(!(cov.prob>0 & cov.prob<1)){
+    stop("The argument 'cov.prob' is a coverage probability for the interval estimates that should lie between 0 and 1. The default is 0.95.")
+  }
+  CrI_LB <- (1 - cov.prob)/2
+  CrI_UB <- 1 - (1 - cov.prob)/2
 
   numpop <- length(x$estimate)
 
   if(is.null(BF.type)){
-    stop("The argument 'BF.type' must be the integer 1 (for the fractional BF) or 2 (for the adjusted fractional BF).")
+    BF.type <- "FBF"
   }
   if(!is.null(BF.type)){
-    if(is.na(BF.type) | (BF.type!=1 & BF.type!=2))
-      stop("The argument 'BF.type' must be the integer 1 (for the fractional BF) or 2 (for the adjusted fractional BF).")
+    if(is.na(BF.type) | (BF.type!="FBF" & BF.type!="AFBF"))
+      stop("The argument 'BF.type' must be 'FBF' (for the fractional BF) or 'AFBF' (for the adjusted fractional BF).")
   }
-  if(BF.type==2){
+  if(BF.type=='AFBF'){
     bayesfactor <- "generalized adjusted fractional Bayes factors"
   }else{
     bayesfactor <- "generalized fractional Bayes factors"
@@ -61,9 +68,19 @@ BF.t_test <- function(x,
     sampledata <- (sampledata - mean(sampledata)) / sd(sampledata)
     sampledata <- sampledata * sqrt(x$v[1]) + xbar
     sampledata_explo <- sampledata - mu0
-    mu <- rep(1,length(sampledata))
-    df.draws <- data.frame(obs=sampledata,obs_explo=sampledata_explo,mu=mu)
-    lm_conf <- lm(obs~mu-1,data=df.draws)
+    if(x$method == "One Sample t-test"){
+      mu <- rep(1,length(sampledata))
+      df.draws <- data.frame(obs=sampledata,obs_explo=sampledata_explo,mu=mu)
+      lm_conf <- lm(obs~mu-1,data=df.draws)
+      sampledata_explo <- sampledata - x$null.value
+      lm_explo <- lm(obs_explo~mu-1,data=df.draws)
+    }else{
+      difference <- rep(1,length(sampledata))
+      df.draws <- data.frame(obs=sampledata,obs_explo=sampledata_explo,difference=difference)
+      lm_conf <- lm(obs~difference-1,data=df.draws)
+      sampledata_explo <- sampledata - x$null.value
+      lm_explo <- lm(obs_explo~difference-1,data=df.draws)
+    }
     BF_conf <- BF(lm_conf,
                   hypothesis=hypothesis,
                   prior.hyp.explo = prior.hyp.explo,
@@ -71,9 +88,8 @@ BF.t_test <- function(x,
                   prior.hyp=prior.hyp,
                   complement=complement,
                   BF.type=BF.type,
-                  log=logIN)
-    sampledata_explo <- sampledata - x$null.value
-    lm_explo <- lm(obs_explo~mu-1,data=df.draws)
+                  log=logIN,
+                  cov.prob=cov.prob)
     BF_explo <- BF(lm_explo,
                    hypothesis=NULL,
                    prior.hyp.explo = prior.hyp.explo,
@@ -81,7 +97,8 @@ BF.t_test <- function(x,
                    prior.hyp=prior.hyp,
                    complement=complement,
                    BF.type=BF.type,
-                   log=logIN)
+                   log=logIN,
+                   cov.prob=cov.prob)
     BF_out <- BF_conf
     BF_out$BFtu_exploratory <- BF_explo$BFtu_exploratory
     BF_out$PHP_exploratory <- BF_explo$PHP_exploratory
@@ -90,81 +107,8 @@ BF.t_test <- function(x,
         paste0("Pr(>",as.character(mu0),")"))
     colnames(BF_out$BFtu_exploratory) <- c("BF0u","BF1u","BF2u")
 
-    # tvalue <- x$statistic
-    # mu0 <- x$null.value
-    # xbar <- x$estimate
-    # df <- x$parameter
-    # n <- df + 1
-    # stderr <- (xbar - mu0) / tvalue #standard error
-    # sigmaML <- stderr*sqrt(n-1)
-    # #evaluation of posterior
-    # relfit0 <- dt((xbar-mu0)/stderr,df=df,log=TRUE) - log(stderr)
-    # relfit1 <- log(1-pt((xbar-mu0)/stderr,df=df))
-    # relfit2 <- log(pt((xbar-mu0)/stderr,df=df))
-    # #evaluation of prior
-    # if(BF.type==2){
-    #   relcomp0 <- dt(0,df=1,log=T) - log(sigmaML)
-    #   relcomp1 <- relcomp2 <- log(.5)
-    # }else{
-    #   relcomp0 <- dt((xbar-mu0)/sigmaML,df=1,log=TRUE) - log(sigmaML)
-    #   relcomp1 <- log(1-pt((xbar-mu0)/sigmaML,df=1))
-    #   relcomp2 <- log(pt((xbar-mu0)/sigmaML,df=1))
-    # }
-    #
-    # #exploratory BFs
-    # if(x$method=="Paired t-test"){
-    #   hypotheses_exploratory <- c(paste0("difference=",as.character(mu0)),paste0("difference<",as.character(mu0)),
-    #                               paste0("difference>",as.character(mu0)))
-    # }else{
-    #   hypotheses_exploratory <- c(paste0("mu=",as.character(mu0)),paste0("mu<",as.character(mu0)),paste0("mu>",as.character(mu0)))
-    # }
-    # logBFtu <- c(relfit0-relcomp0,relfit1-relcomp1,relfit2-relcomp2)
-    # names(logBFtu) <- hypotheses_exploratory
-    # BFtu_exploratory <- matrix(logBFtu,nrow=1)
-    # maxBFtu <- max(BFtu_exploratory)
-    # colnames(BFtu_exploratory) <- hypotheses_exploratory
-    # row.names(BFtu_exploratory) <- "BFtu"
-    # PHP_exploratory <- exp(BFtu_exploratory - maxBFtu) /sum(exp(BFtu_exploratory - maxBFtu))
-    # colnames(PHP_exploratory) <- c(paste0("Pr(=",as.character(mu0),")"),paste0("Pr(<",as.character(mu0),")"),
-    #                                paste0("Pr(>",as.character(mu0),")"))
-    # if(x$method=="Paired t-test"){
-    #   row.names(PHP_exploratory) <- "difference"
-    # }else{
-    #   row.names(PHP_exploratory) <- "mu"
-    # }
-    #
-    # # relfit_exploratory <- matrix(c(exp(relfit0),rep(1,3),exp(relfit1),exp(relfit2)),ncol=2)
-    # # relcomp_exploratory <- matrix(c(exp(relcomp0),rep(1,3),rep(.5,2)),ncol=2)
-    # # row.names(relfit_exploratory) <- row.names(relcomp_exploratory) <- hypotheses_exploratory
-    # # colnames(relfit_exploratory) <- c("f=","f>")
-    # # colnames(relcomp_exploratory) <- c("c=","c>")
-    #
-    # if(!is.null(hypothesis)){ #perform confirmatory tests
-    #   #execute via BF.lm
-    #   sd1 <- sqrt(n) * (xbar - mu0) / tvalue
-    #   y1 <- rnorm(n)
-    #   y1 <- y1 - mean(y1)
-    #   y1 <- sd1*y1/sd(y1) + xbar
-    #   lm1 <- lm(y1 ~ 1)
-    #   if(x$method=="Paired t-test"){
-    #     names(lm1$coefficients) <- "difference"
-    #   }else{
-    #     names(lm1$coefficients) <- "mu"
-    #   }
-    #   BFlm1 <- BF(lm1,hypothesis,prior.hyp=prior.hyp,complement=complement,BF.type=BF.type,log=logIN)
-    #   BFlm1$parameter <- "mu"
-    #   # BFtu_confirmatory <- BFlm1$BFtu_confirmatory
-    #   # PHP_confirmatory <- BFlm1$PHP_confirmatory
-    #   # BFmatrix_confirmatory <- BFlm1$BFmatrix_confirmatory
-    #   # BFtable <- BFlm1$BFtable_confirmatory
-    #   # hypotheses <- row.names(BFtable)
-    #   # priorprobs <- BFlm1$prior
-    # }
-    # if(x$method=="Paired t-test"){
-    #   parameter <- "mean difference"
-    # }else{
-    #   parameter <- "mean"
-    # }
+    estimates_ttest <- BF_explo$estimates
+
   }else{ # two samples t test
 
     if(!grepl("Welch",x$method)){ # equal variances assumed
@@ -189,19 +133,14 @@ BF.t_test <- function(x,
                    prior.hyp=prior.hyp,
                    complement=complement,
                    BF.type=BF.type,
-                   log=logIN)
+                   log=logIN,
+                   cov.prob=cov.prob)
       BF_out$BFtu_exploratory <- t(as.matrix(BF_out$BFtu_exploratory[2,]))
       BF_out$PHP_exploratory <- t(as.matrix(BF_out$PHP_exploratory[2,]))
       row.names(BF_out$BFtu_exploratory) <- row.names(BF_out$PHP_exploratory) <- "difference"
 
-      # if(!is.null(hypothesis)){
-      #   BFtu_confirmatory <- BFlm1$BFtu_confirmatory
-      #   PHP_confirmatory <- BFlm1$PHP_confirmatory
-      #   BFmatrix_confirmatory <- BFlm1$BFmatrix_confirmatory
-      #   BFtable <- BFlm1$BFtable_confirmatory
-      #   hypotheses <- row.names(BFtable)
-      #   priorprobs <- BFlm1$prior
-      # }
+      estimates_ttest <- BF_out$estimates
+
     }else{ #equal variances not assumed. BF.lm cannot be used
 
       # check proper usage of argument 'prior.hyp.conf' and 'prior.hyp.explo'
@@ -225,8 +164,16 @@ BF.t_test <- function(x,
       relfit1 <- log(mean(pnorm(x$null.value,
                                 mean=diff.obs,
                                 sd=sqrt(1/sigma2_1.draws*1/nvec[1] + 1/sigma2_2.draws*1/nvec[2]))))
+
+      diff.draws <- rnorm(iter,mean=diff.obs,sd=sqrt(1/sigma2_1.draws*1/nvec[1] + 1/sigma2_2.draws*1/nvec[2]))
+      estimates_ttest <- t(c(mean(diff.draws),median(diff.draws),quantile(diff.draws,CrI_LB),
+                         quantile(diff.draws,CrI_UB)))
+      row.names(estimates_ttest) <- "difference"
+      colnames(estimates_ttest) <- c("mean","median",paste0(as.character(round(CrI_LB*100,7)),"%"),
+                                    paste0(as.character(round(CrI_UB*100,7)),"%"))
+
       relfit2 <- log(1 - exp(relfit1))
-      if(BF.type == 2){
+      if(BF.type == 'AFBF'){
         prior.mean <- x$null.value
       }else{
         prior.mean <- diff.obs
@@ -275,7 +222,7 @@ BF.t_test <- function(x,
           rStack <- RrStack[,2]
         }
 
-        if(BF.type==2){
+        if(BF.type=='AFBF'){
           # check if a common boundary exists for prior location under all constrained hypotheses
           # necessary for the adjusted FBF
           if(nrow(RrStack) > 1){
@@ -445,7 +392,7 @@ BF.t_test <- function(x,
         prior.hyp.explo=prior.hyp.explo,
         prior.hyp.conf=priorprobs,
         hypotheses=hypotheses,
-        estimates=x$coefficients,
+        estimates=estimates_ttest,
         model=x,
         bayesfactor=bayesfactor,
         parameter=parameter,

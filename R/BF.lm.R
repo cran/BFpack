@@ -12,18 +12,25 @@ BF.lm <- function(x,
                   prior.hyp = NULL,
                   complement = TRUE,
                   log = FALSE,
-                  BF.type = 2,
+                  cov.prob = .95,
+                  BF.type = NULL,
                   iter = 1e4,
                   ...){
 
+  if(!(cov.prob>0 & cov.prob<1)){
+    stop("The argument 'cov.prob' is a coverage probability for the interval estimates that should lie between 0 and 1. The default is 0.95.")
+  }
+  CrI_LB <- (1 - cov.prob)/2
+  CrI_UB <- 1 - (1 - cov.prob)/2
+
   if(is.null(BF.type)){
-    stop("The argument 'BF.type' must be the integer 1 (for the fractional BF) or 2 (for the adjusted fractional BF).")
+    BF.type <- "FBF"
   }
   if(!is.null(BF.type)){
-    if(is.na(BF.type) | (BF.type!=1 & BF.type!=2))
-      stop("The argument 'BF.type' must be the integer 1 (for the fractional BF) or 2 (for the adjusted fractional BF).")
+    if(is.na(BF.type) | (BF.type!="FBF" & BF.type!="AFBF"))
+      stop("The argument 'BF.type' must be 'FBF' (for the fractional BF) or 'AFBF' (for the adjusted fractional BF).")
   }
-  if(BF.type==2){
+  if(BF.type=="AFBF"){
     bayesfactor <- "generalized adjusted fractional Bayes factors"
   }else{
     bayesfactor <- "generalized fractional Bayes factors"
@@ -103,59 +110,6 @@ BF.lm <- function(x,
         stop("Not enough observations to compute a fractional Bayes factor.")
       }
     }
-
-    # dummy01TRUE <- prod(unlist(lapply(1:length(x$contrasts),function(fac){
-    #   x$contrasts[[fac]] == "contr.treatment"
-    # }))) == 1
-    # if(dummy01TRUE){
-    #   numlevels <- unlist(lapply(x$xlevels,length))
-    #   mains <- unlist(lapply(1:length(x$xlevels),function(fac){
-    #     unlist(lapply(1:length(x$xlevels[[fac]]),function(lev){
-    #       paste0(names(x$xlevels)[fac],x$xlevels[[fac]][lev])
-    #     }))
-    #   }))
-    #   intercept <- attr(x$terms,"intercept")==1
-    #   names_coef <- row.names(x$coefficients)
-    #   # dummyX1 checks which columns of the design matrix X are dummy's for a
-    #   # main effect or interaction effect
-    #   dummyX1 <- apply(matrix(unlist(lapply(1:length(mains),function(faclev){
-    #     unlist(lapply(1:length(names_coef),function(cf){
-    #       grepl(mains[faclev],names_coef[cf],fixed=TRUE)
-    #     }))
-    #   })),nrow=length(names_coef)),1,max)==1
-    # }else{
-    #   dummyX1 <- rep(TRUE,K)
-    # }
-    # # dummyX2 checks which columns of the design matrix have two possible outcomes,
-    # # which indicates a dummy variable
-    # dummyX2 <- unlist(lapply(1:K,function(k){
-    #   length(table(Xmat[,k])) == 2
-    # }))
-    # # dummyX indicate which columns contain dummy group covariates
-    # dummyX <- dummyX2 * dummyX1 == 1
-    # #number of groups on variations of dummy combinations
-    # groupcode <- as.matrix(unique(Xmat[,dummyX]))
-    # rownames(groupcode) <- unlist(lapply(1:nrow(groupcode),function(r){
-    #   paste0("groupcode",r)
-    # }))
-    # J <- nrow(groupcode)
-    # if(J==nrow(Xmat)){
-    #   stop("Not enough observations for every group. Try fitting the model without factors.")
-    # }
-    #
-    # # group membership of each observation
-    # dvec <- unlist(lapply(1:N,function(i){
-    #   which(rowSums(abs(t(matrix(rep(Xmat[i,dummyX],J),ncol=J)) - groupcode))==0)
-    # }))
-    # Nj <- c(table(dvec))
-    # #set minimal fractions for each group
-    # bj <- ((P+K)/J)/Nj
-    # if(max(bj)>1){#then too few observations in certain groups, then use one single minimal fraction
-    #   bj <- rep((P+K)/sum(Nj),length=J)
-    #   if(bj[1]>1){
-    #     stop("Not enough observations to compute a fractional Bayes factor.")
-    #   }
-    # }
   }
 
   #Compute sufficient statistics for all groups
@@ -203,9 +157,15 @@ BF.lm <- function(x,
 
   # BF computation for exploratory analysis of separate parameters
   if(P==1){
+    if(sum(row.names(x$coefficients) == "(Intercept)") > 0){
+      row.names(x$coefficients)[which(row.names(x$coefficients) == "(Intercept)")] <- "Intercept"
+    }
     names_coef <- row.names(x$coefficients)
   }else{
     names_coef1 <- row.names(x$coefficients)
+    if(sum(names_coef1 == "(Intercept)")>0){
+      names_coef1[which(names_coef1 == "(Intercept)")] <- "Intercept"
+    }
     names_coef2 <- colnames(x$coefficients)
     names_coef <- unlist(lapply(1:P,function(p){
       lapply(1:K,function(k){
@@ -217,7 +177,7 @@ BF.lm <- function(x,
   # prior hyperparameters
   df0 <- 1 # should be the same as sum(rep(bj,times=Nj))-K-P+1
   Scale0 <- kronecker(S_b,tXXi_b)
-  if(BF.type==2){
+  if(BF.type=="AFBF"){
     mean0 <- as.matrix(rep(0,K*P))
   }else{
     mean0 <- as.matrix(c(BetaHat_b))
@@ -256,13 +216,14 @@ BF.lm <- function(x,
   #compute estimates
   postestimates <- cbind(meanN,meanN,
                          t(matrix(unlist(lapply(1:length(meanN),function(coef){
-                           ub <- qt(p=.975,df=dfN)*sqrt(ScaleN[coef,coef])+meanN[coef,1]
-                           lb <- qt(p=.025,df=dfN)*sqrt(ScaleN[coef,coef])+meanN[coef,1]
+                           ub <- qt(p=CrI_UB,df=dfN)*sqrt(ScaleN[coef,coef])+meanN[coef,1]
+                           lb <- qt(p=CrI_LB,df=dfN)*sqrt(ScaleN[coef,coef])+meanN[coef,1]
                            return(c(lb,ub))
                          })),nrow=2))
   )
   row.names(postestimates) <- names_coef
-  colnames(postestimates) <- c("mean","median","2.5%","97.5%")
+  colnames(postestimates) <- c("mean","median",paste0(as.character(round(CrI_LB*100,7)),"%"),
+                               paste0(as.character(round(CrI_UB*100,7)),"%"))
 
   # Additional exploratory tests of main effects and interaction effects
   # in the case of an aov type object
@@ -459,7 +420,7 @@ BF.lm <- function(x,
     }
 
     # check if a common boundary exists for prior location under all constrained hypotheses
-    if(nrow(RrStack) > 1 & BF.type == 2){
+    if(nrow(RrStack) > 1 & BF.type == "AFBF"){
       rref_ei <- rref(RrStack)
       nonzero <- rref_ei[,P*K+1]!=0
       if(max(nonzero)>0){
@@ -476,7 +437,7 @@ BF.lm <- function(x,
     if(P > 1){
 
       #default prior location
-      if(BF.type==2){
+      if(BF.type=="AFBF"){
         Mean0 <- matrix(c(ginv(RStack)%*%rStack),nrow=K,ncol=P)
       }else{
         Mean0 <- BetaHat #mean0
@@ -591,38 +552,6 @@ BF.lm <- function(x,
         row.names(relcomp) <- row.names(relfit) <- hypothesisshort
       }
 
-      # # the BF for the complement hypothesis vs Hu needs to be computed.
-      # BFtu_conf <- relfit - relcomp
-      # BFtu_confirmatory <- c(apply(BFtu_conf, 1, sum))
-      # # Check input of prior probabilies
-      # if(is.null(prior.hyp)){
-      #   priorprobs <- rep(1/length(BFtu_confirmatory),length(BFtu_confirmatory))
-      # }else{
-      #   if(!is.numeric(prior.hyp) || length(prior.hyp)!=length(BFtu_confirmatory)){
-      #     warning(paste0("Argument 'prior.hyp' should be numeric and of length ",as.character(length(BFtu_confirmatory)),". Equal prior probabilities are used."))
-      #     priorprobs <- rep(1/length(BFtu_confirmatory),length(BFtu_confirmatory))
-      #   }else{
-      #     priorprobs <- prior.hyp
-      #   }
-      # }
-      #
-      # names(priorprobs) <- names(BFtu_confirmatory)
-      # BFtu_scaled <- BFtu_confirmatory - max(BFtu_confirmatory)
-      # PHP_confirmatory <- exp(BFtu_scaled)*priorprobs / sum(exp(BFtu_scaled)*priorprobs)
-      # BFtable <- cbind(relcomp,relfit,relfit[,1]/relcomp[,1],relfit[,2]/relcomp[,2],
-      #                  apply(relfit,1,prod)/apply(relcomp,1,prod),PHP_confirmatory)
-      # row.names(BFtable) <- names(PHP_confirmatory)
-      # colnames(BFtable) <- c("comp_E","comp_O","fit_E","fit_O","BF_E","BF_O","BF","PHP")
-      # BFmatrix_confirmatory <- matrix(rep(BFtu_confirmatory,length(BFtu_confirmatory)),ncol=length(BFtu_confirmatory)) -
-      #   t(matrix(rep(BFtu_confirmatory,length(BFtu_confirmatory)),ncol=length(BFtu_confirmatory)))
-      # diag(BFmatrix_confirmatory) <- 1
-      # row.names(BFmatrix_confirmatory) <- colnames(BFmatrix_confirmatory) <- names(BFtu_confirmatory)
-      # if(nrow(relfit)==length(parse_hyp$original_hypothesis)){
-      #   hypotheses <- parse_hyp$original_hypothesis
-      # }else{
-      #   hypotheses <- c(parse_hyp$original_hypothesis,"complement")
-      # }
-
     }else{
       # one dependent variable and posterior/prior have Student t distributions
 
@@ -630,7 +559,7 @@ BF.lm <- function(x,
       df0 <- 1 # should be the same as sum(rep(bj,times=Nj))-K-P+1
       Scale0 <- kronecker(S_b,tXXi_b)
       #default prior location
-      if(BF.type==2){
+      if(BF.type=="AFBF"){
         mean0 <- ginv(RStack)%*%rStack
       }else{
         mean0 <- BetaHat #mean0
@@ -656,37 +585,13 @@ BF.lm <- function(x,
 
       if(complement == TRUE){
         # Compute relative fit/complexity for the complement hypothesis
-        relfit <- Student_prob_Hc(meanN,ScaleN,dfN,relfit,hypothesis,RrO)
-        relcomp <- Student_prob_Hc(mean0,Scale0,df0,relcomp,hypothesis,RrO)
+        relfit <- Student_prob_Hc(mean1=meanN,scale1=ScaleN,df1=dfN,relmeas1=relfit,
+                                  constraints=hypothesis,RrO1=RrO)
+        relcomp <- Student_prob_Hc(mean1=mean0,scale1=Scale0,df1=df0,relmeas1=relcomp,
+                                   constraints=hypothesis,RrO1=RrO)
         row.names(relcomp)[1:numhyp] <- parse_hyp$original_hypothesis
         row.names(relfit)[1:numhyp] <- parse_hyp$original_hypothesis
       }
-
-      # # the BF for the complement hypothesis vs Hu needs to be computed.
-      # BFtu_confirmatory <- c(apply(relfit - relcomp, 1, sum))
-      # # Check input of prior probabilies
-      # if(is.null(prior.hyp)){
-      #   priorprobs <- rep(1/length(BFtu_confirmatory),length(BFtu_confirmatory))
-      # }else{
-      #   if(!is.numeric(prior.hyp) || length(prior.hyp)!=length(BFtu_confirmatory)){
-      #     warning(paste0("Argument 'prior.hyp' should be numeric and of length ",as.character(length(BFtu_confirmatory)),". Equal prior probabilities are used."))
-      #     priorprobs <- rep(1/length(BFtu_confirmatory),length(BFtu_confirmatory))
-      #   }else{
-      #     priorprobs <- prior.hyp
-      #   }
-      # }
-      # names(priorprobs) <- names(BFtu_confirmatory)
-      # PHP_confirmatory <- BFtu_confirmatory*priorprobs / sum(BFtu_confirmatory*priorprobs)
-      # BFtable <- cbind(relcomp,relfit,relfit[,1]/relcomp[,1],relfit[,2]/relcomp[,2],
-      #                  BFtu_confirmatory,PHP_confirmatory)
-      # row.names(BFtable) <- names(BFtu_confirmatory)
-      # colnames(BFtable) <- c("complex=","complex>","fit=","fit>","BF=","BF>","BF","PHP")
-      # BFmatrix_confirmatory <- matrix(rep(BFtu_confirmatory,length(BFtu_confirmatory)),ncol=length(BFtu_confirmatory))/
-      #   t(matrix(rep(BFtu_confirmatory,length(BFtu_confirmatory)),ncol=length(BFtu_confirmatory)))
-      # diag(BFmatrix_confirmatory) <- 1
-      # row.names(BFmatrix_confirmatory) <- colnames(BFmatrix_confirmatory) <- names(BFtu_confirmatory)
-      # #tested hypotheses
-      # hypotheses <- row.names(relfit)
     }
 
     # the BF for the complement hypothesis vs Hu needs to be computed.
@@ -753,6 +658,7 @@ BF.lm <- function(x,
       log = logIN,
       fraction_number_groupIDs = J,
       fraction_groupID_observations = dvec,
+      fraction_groupID = bj,
       call=match.call())
   }else{
     BFlm_out <- list(
@@ -772,6 +678,7 @@ BF.lm <- function(x,
       log = logIN,
       fraction_number_groupIDs = J,
       fraction_groupID_observations = dvec,
+      fraction_groupID = bj,
       call=match.call())
   }
 
@@ -948,7 +855,7 @@ Student_measures <- function(mean1,Scale1,df1,RrE1,RrO1,names1=NULL,constraints1
         relO <- pt((rO1-meanO)/sqrt(scaleO[1,1]),df=df1,lower.tail=FALSE,log.p = TRUE)
       }else{
         relO <- pmvt(lower=rO1,upper=Inf,delta=meanO,sigma=scaleO,df=df1,
-             type="shifted",algorithm="TVPACK")[1]
+             type="shifted")[1]
         if(relO<0){relO <- 0}
         if(relO>1){relO <- 1}
         relO <- log(relO)
@@ -1034,7 +941,7 @@ Student_measures <- function(mean1,Scale1,df1,RrE1,RrO1,names1=NULL,constraints1
                    log.p = TRUE)[1]
       } else { # multivariate
         relO <- pmvt(lower = rO1tilde, upper = Inf, delta = delta_trans, sigma = scale1_trans,
-                         df = df1+qE1, type = "shifted",algorithm="TVPACK")[1]
+                         df = df1+qE1, type = "shifted")[1]
         if(relO<0){relO <- 0}
         if(relO>1){relO <- 1}
         relO <- log(relO)
@@ -1086,10 +993,11 @@ MatrixStudent_prob_Hc <- function(Mean1,Scale1,tXXi1,df1,relmeas,RrO1){
       randomDraws <- rmvnorm(draws2,mean=rep(0,numpara),sigma=diag(numpara))
       #get draws that satisfy the constraints of the separate order constrained hypotheses
       checksOC <- lapply(welk,function(h){
-        Rorder <- as.matrix(RrO1[[h]][,-(1+numpara)])
-        if(ncol(Rorder)==1){
-          Rorder <- t(Rorder)
-        }
+        #Rorder <- as.matrix(RrO1[[h]][,-(1+numpara)])
+        Rorder <- matrix(RrO1[[h]][,-(1+numpara)],nrow=nrow(RrO1[[h]]))
+        #if(ncol(Rorder)==1){
+        #  Rorder <- t(Rorder)
+        #}
         rorder <- as.matrix(RrO1[[h]][,1+numpara])
         apply(randomDraws%*%t(Rorder) > rep(1,draws2)%*%t(rorder),1,prod)
       })
@@ -1114,10 +1022,11 @@ MatrixStudent_prob_Hc <- function(Mean1,Scale1,tXXi1,df1,relmeas,RrO1){
           })),nrow=numpara)
 
           checksOC <- lapply(welk,function(h){
-            Rorder <- as.matrix(RrO1[[h]][,-(1+numpara)])
-            if(ncol(Rorder)==1){
-              Rorder <- t(Rorder)
-            }
+            #Rorder <- as.matrix(RrO1[[h]][,-(1+numpara)])
+            Rorder <- matrix(RrO1[[h]][,-(1+numpara)],nrow=nrow(RrO1[[h]]))
+            #if(ncol(Rorder)==1){
+            #  Rorder <- t(Rorder)
+            #}
             rorder <- as.matrix(RrO1[[h]][,1+numpara])
             apply(Rorder%*%randomDraws > rorder%*%t(rep(1,draws2)),2,prod)
           })
@@ -1158,10 +1067,11 @@ Student_prob_Hc <- function(mean1,scale1,df1,relmeas1,constraints,RrO1=NULL){
       randomDraws <- rmvnorm(draws2,mean=rep(0,numpara),sigma=diag(numpara))
       #get draws that satisfy the constraints of the separate order constrained hypotheses
       checksOC <- lapply(welk,function(h){
-        Rorder <- as.matrix(RrO1[[h]][,-(1+numpara)])
-        if(ncol(Rorder)==1){
-          Rorder <- t(Rorder)
-        }
+        #Rorder <- as.matrix(RrO1[[h]][,-(1+numpara)])
+        Rorder <- matrix(RrO1[[h]][,-(1+numpara)],nrow=nrow(RrO1[[h]]))
+        #if(ncol(Rorder)==1){
+        #  Rorder <- t(Rorder)
+        #}
         rorder <- as.matrix(RrO1[[h]][,1+numpara])
         apply(randomDraws%*%t(Rorder) > rep(1,draws2)%*%t(rorder),1,prod)
       })
@@ -1170,7 +1080,7 @@ Student_prob_Hc <- function(mean1,scale1,df1,relmeas1,constraints,RrO1=NULL){
       if(sum(checkOCplus > 0) < draws2){ #then the joint order constrained hypotheses do not completely cover the parameter space.
         if(sum(checkOCplus>1)==0){ # then order constrained spaces are nonoverlapping
           relmeas <- rbind(relmeas,rep(log(1),2))
-          relmeas[numhyp+1,2] <- 1 - sum(exp(relmeas[welk,2]))
+          relmeas[numhyp+1,2] <- log(1 - sum(exp(relmeas[welk,2])))
           rownames(relmeas)[numhyp+1] <- "complement"
         }else{ #the order constrained subspaces at least partly overlap
 
@@ -1179,10 +1089,11 @@ Student_prob_Hc <- function(mean1,scale1,df1,relmeas1,constraints,RrO1=NULL){
 
           randomDraws <- rmvt(draws2,delta=mean1,sigma=scale1,df=df1)
           checksOC <- lapply(welk,function(h){
-            Rorder <- as.matrix(RrO1[[h]][,-(1+numpara)])
-            if(ncol(Rorder)==1){
-              Rorder <- t(Rorder)
-            }
+            #Rorder <- as.matrix(RrO1[[h]][,-(1+numpara)])
+            Rorder <- matrix(RrO1[[h]][,-(1+numpara)],nrow=nrow(RrO1[[h]]))
+            #if(ncol(Rorder)==1){
+            #  Rorder <- t(Rorder)
+            #}
             rorder <- as.matrix(RrO1[[h]][,1+numpara])
             apply(randomDraws%*%t(Rorder) > rep(1,draws2)%*%t(rorder),1,prod)
           })

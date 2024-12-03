@@ -101,6 +101,9 @@ get_estimates.lm <- function(x, ...){
   K <- nrow(x$coefficients)
   N <- nrow(x$residuals)
   if(!is.matrix(x$coefficients)){
+    if(sum(names(x$coefficients) == "(Intercept)")>0){
+      names(x$coefficients)[which(names(x$coefficients) == "(Intercept)")] <- "Intercept"
+    }
     out$estimate <- coef(x)
     out$Sigma <- list(vcov(x))
     class(out) <- "model_estimates"
@@ -108,6 +111,9 @@ get_estimates.lm <- function(x, ...){
     out
   }else{
     names_coef1 <- row.names(x$coefficients)
+    if(sum(names_coef1 == "(Intercept)")>0){
+      names_coef1[which(names_coef1 == "(Intercept)")] <- "Intercept"
+    }
     names_coef2 <- colnames(x$coefficients)
     names_coef <- unlist(lapply(1:P,function(p){
       lapply(1:K,function(k){
@@ -153,7 +159,7 @@ get_estimates.t_test <- function(x, ...){
     names(difference) <- "difference"
     out$estimate <- difference
     out$Sigma <- list((x$stderr)**2)
-  }else if(names(x$estimate) == "mean of the differences"){
+  }else if(names(x$estimate) == "mean difference"){
     difference <- x$estimate
     names(difference) <- "difference"
     out$estimate <- difference
