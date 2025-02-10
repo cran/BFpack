@@ -155,9 +155,9 @@ BF.cor_test <- function(x,
       BFtu_confirmatory <- PHP_confirmatory <- BFmatrix_confirmatory <- relfit <-
         relcomp <- hypotheses <- BFtable <- priorprobs <- NULL
       warning(
-        "The 'hypothesis' argument not used. No manual hypothesis test is supported when the prior of the
-correlation matrix is marginally uniform. Set the 'prior.cor' argument in cor_test() to 'joint.unif'
-for manual hypothesis testing (Mulder and Gelissen, 2023).")
+        "The 'hypothesis' argument is not supported when using the marginally uniform prior. Only testing
+single correlations via the standard tests are supported. Comparing correlations is not recommended when
+using the marginally uniform prior (Mulder and Gelissen, 2023, Section 4.2.2).")
     }else{
 
       #check if constraints are formulated on correlations in different populations
@@ -324,7 +324,8 @@ draw_ju_r <- function(P, samsize=50000, Fisher=1){
 #' @name cor_test
 #'
 #' @description Estimate the unconstrained posterior for the correlations using a joint uniform prior (Mulder and Gelissen,
-#' 2023) or a marginally uniform prior (Barnard et al., 2000, Mulder, 2016).
+#' 2023) or a marginally uniform prior (Barnard et al., 2000, Mulder, 2016). Correlation matrices are sampled from the posterior
+#' using the MCMC algorithm of Talhouk et al. (2012).
 #'
 #' @param ...  matrices (or data frames) of dimensions \emph{n} (observations) by  \emph{p} (variables)
 #' for different groups (in case of multiple matrices or data frames).
@@ -350,17 +351,21 @@ draw_ju_r <- function(P, samsize=50000, Fisher=1){
 #' \item \code{corrnames} names of all correlations
 #' }
 #'
+#' @references Barnard, J., McCulloch, R., & Meng, X. L. (2000). Modeling covariance matrices in terms of standard deviations and
+#' correlations, with application to shrinkage. Statistica Sinica, 1281-1311. <https://www.jstor.org/stable/24306780>
+#'
+#' @references Joe, H. (2006). Generating random correlation matrices based on partial correlations. Journal of Multivariate
+#' Analysis, 97(10), 2177-2189. <https://doi.org/10.1016/j.jmva.2005.05.010>
+#'
 #' @references Mulder, J., & Gelissen, J. P. (2023). Bayes factor testing of equality and order constraints on measures of
 #' association in social research. Journal of Applied Statistics, 50(2), 315-351. <https://doi.org/10.1080/02664763.2021.1992360>
 #'
 #' @references Mulder, J. (2016). Bayes factors for testing order-constrained hypotheses on correlations. Journal of Mathematical
 #' Psychology, 72, 104-115. <https://doi.org/10.1016/j.jmp.2014.09.004>
 #'
-#' @references Barnard, J., McCulloch, R., & Meng, X. L. (2000). Modeling covariance matrices in terms of standard deviations and
-#' correlations, with application to shrinkage. Statistica Sinica, 1281-1311. <https://www.jstor.org/stable/24306780>
-#'
-#' @references Joe. Generating random correlation matrices based on partial correlations, Journal of Multivariate Analysis,
-#' 97(10), 2177-2189. <https://doi.org/10.1016/j.jmva.2005.05.010>
+#' @references Talhouk, A., Doucet, A., & Murphy, K. (2012). Efficient Bayesian inference for multivariate probit models with
+#' sparse inverse correlation matrices. Journal of Computational and Graphical Statistics, 21(3), 739-757.
+#' <https://doi.org/10.1080/10618600.2012.679239>
 #'
 #' @examples
 #' \donttest{
@@ -386,19 +391,20 @@ draw_ju_r <- function(P, samsize=50000, Fisher=1){
 #' }
 #' @rdname cor_test
 #' @export
-cor_test <- function(..., formula = NULL, iter = 5e3, burnin = 3e3, nugget.scale = .995){
+cor_test <- function(..., formula = NULL, iter = 5e3, burnin = 3e3, nugget.scale = .999){
 
+  # if(is.na(prior.cor)){stop("'prior.cor' argument needs to be either 'joint.unif' or 'marg.unif'. See ?cor_test.")}
+  # if(is.null(prior.cor)){stop("'prior.cor' argument needs to be either 'joint.unif' or 'marg.unif'. See ?cor_test.")}
+  # if(!(prior.cor == "joint.unif" | prior.cor == "marg.unif")){
+  #   stop("'prior.cor' argument needs to be either 'joint.unif' or 'marg.unif'. See ?cor_test.")}
+  # if(prior.cor == "joint.unif"){
+  #   priorchoice <- 1
+  # }else{
+  #   priorchoice <- 2
+  # }
   prior.cor <- "joint.unif"
+  priorchoice <- 1
 
-  if(is.na(prior.cor)){stop("'prior.cor' argument needs to be either 'joint.unif' or 'marg.unif'. See ?cor_test.")}
-  if(is.null(prior.cor)){stop("'prior.cor' argument needs to be either 'joint.unif' or 'marg.unif'. See ?cor_test.")}
-  if(!(prior.cor == "joint.unif" | prior.cor == "marg.unif")){
-    stop("'prior.cor' argument needs to be either 'joint.unif' or 'marg.unif'. See ?cor_test.")}
-  if(prior.cor == "joint.unif"){
-    priorchoice <- 1
-  }else{
-    priorchoice <- 2
-  }
 
   if(!is.numeric(nugget.scale)){stop("'nugget.scale' should be a numerical scalar.")}
   if(nugget.scale > 1 | nugget.scale < 0){stop("'nugget.scale' should be very close 1. If should not exceed 1 nor fall below 0.")}
@@ -576,6 +582,7 @@ cor_test <- function(..., formula = NULL, iter = 5e3, burnin = 3e3, nugget.scale
   # call Fortran subroutine for Gibbs sampling using noninformative improper priors
   # for regression coefficients, Jeffreys priors for standard deviations, and a proper
   # joint uniform prior for the correlation matrices.
+
   res <- .Fortran("estimate_bct_ordinal",
                   postZmean=matrix(as.double(0),nrow=numcorr,ncol=1),
                   postZcov=matrix(as.double(0),nrow=numcorr,ncol=numcorr),
@@ -584,7 +591,7 @@ cor_test <- function(..., formula = NULL, iter = 5e3, burnin = 3e3, nugget.scale
                   K=as.integer(K),
                   numG=as.integer(numG),
                   BHat=BHat,
-                  sdHat=sdsd,
+                  sdHat=sdHat,
                   CHat=CHat,
                   XtXi=XtXi,
                   samsize0=as.integer(samsize0),
@@ -604,9 +611,8 @@ cor_test <- function(..., formula = NULL, iter = 5e3, burnin = 3e3, nugget.scale
                   Cat_in=numcats,
                   maxCat=as.integer(max(numcats)),
                   gLiuSab=gLiuSab,
-                  #seed=as.integer(sample.int(1e6,1)),
-                  nuggetscale=as.double(nugget.scale),
-                  priorchoice = as.integer(priorchoice)
+                  nuggetscale=as.double(nugget.scale)
+                  #priorchoice = as.integer(priorchoice)
                   #,WgroupsStore=array(as.double(0),dim=c(samsize0,numG,Ntot,P)),
                   #meanMatMeanStore = array(as.double(0),dim=c(samsize0,Ntot,P)),
                   #SigmaMatDrawStore = array(as.double(0),dim=c(samsize0,P,P)),

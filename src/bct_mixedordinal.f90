@@ -41,7 +41,7 @@ end module
 
 subroutine estimate_bct_ordinal(postZmean, postZcov, P, numcorr, K, numG, BHat, sdHat, CHat, XtXi, samsize0, &
     burnin, Ntot, Njs_in, Xgroups, Ygroups, C_quantiles, sigma_quantiles, B_quantiles, BDrawsStore, &
-    sigmaDrawsStore, CDrawsStore, sdMH, ordinal_in, Cat_in, maxCat, gLiuSab, nuggetscale, priorchoice)
+    sigmaDrawsStore, CDrawsStore, sdMH, ordinal_in, Cat_in, maxCat, gLiuSab, nuggetscale)
 !    WgroupsStore, meanMatMeanStore, SigmaMatDrawStore, CheckStore)
 !
     use rkinds0, only: rint, rdp
@@ -49,10 +49,10 @@ subroutine estimate_bct_ordinal(postZmean, postZcov, P, numcorr, K, numG, BHat, 
 !
     implicit none
 !
-    integer(rint), intent(in) ::P, numcorr, K, numG, samsize0, burnin, Ntot, maxCat, priorchoice
+    integer(rint), intent(in) ::P, numcorr, K, numG, samsize0, burnin, Ntot, maxCat!, priorchoice
     real(rdp), intent(in) ::  BHat(numG,K,P), sdHat(numG,P), CHat(numG,P,P), XtXi(numG,K,K), Cat_in(numG,P), &
-                              sdMH(numG,P), Xgroups(numG,Ntot,K), Ygroups(numG,Ntot,P), ordinal_in(numG,P), &
-                              nuggetscale, Njs_in(numG,1)
+                              Xgroups(numG,Ntot,K), Ygroups(numG,Ntot,P), ordinal_in(numG,P), &
+                              sdMH(numG,P), nuggetscale, Njs_in(numG,1)
     real(rdp), intent(out)::  postZmean(numcorr,1), postZcov(numcorr,numcorr), B_quantiles(numG,K,P,3), &
                               C_quantiles(numG,P,P,3), sigma_quantiles(numG,P,3), BDrawsStore(samsize0,numG,K,P), &
                               sigmaDrawsStore(samsize0,numG,P), CDrawsStore(samsize0,numG,P,P), &
@@ -61,13 +61,14 @@ subroutine estimate_bct_ordinal(postZmean, postZcov, P, numcorr, K, numG, BHat, 
                               !CheckStore(samsize0,numG,10,P,P)
     real(rdp) ::  BDraws(numG,K,P), CDraws(numG,P,P), sigmaDraws(numG,P), meanMat(Ntot,P), SigmaMatDraw(P,P), &
                   R_MH, covBeta(K*P,K*P), Ds(P,P), Ccan(P,P), CcanInv(P,P), Ccurr(P,P), epsteps(P,P), &
-                  SS1(P,P), SS1inv(P,P), rnunif, errorMatj(P,P), sigma_can(P), aa, bb, &
+                  SS1(P,P), SS1inv(P,P), rnunif, errorMatj(P,P), sigma_can(P), aa, bb, CcurrInv(numG,P,P), &
                   betaDrawj(1,P*K), acceptSigma(numG,P), dummyPP(P,P), dummyPPinv(P,P), &
                   varz1, varz2, varz1z2Plus, varz1z2Min, Cnugget(P,P), SigmaInv(P,P), sdMHg(numG,P), gLiuSab_can, &
                   Wgroups(numG,Ntot,P), alphaMin, alphaMax, Cinv(P,P), Bmean(K,P), acceptLS(numG,P), &
                   alphaMat(numG,maxCat+1,P), Wdummy(numG,P,Ntot,maxCat), condMean, condVar, &
                   Zcorr_sample(samsize0,numcorr), dummy3(samsize0), dummy2(samsize0), priorScale(P,P), &
-                  diffmat(Ntot,P), meanO(P*K), para((P*K)*((P*K)+3)/2 + 1), randraw, gLiuSab_curr(numG,P)
+                  diffmat(Ntot,P), meanO(P*K), para((P*K)*((P*K)+3)/2 + 1), randraw, gLiuSab_curr(numG,P), &
+                  logR_MH
     integer(rint) ::s1, g1, i1, corrteller, Cat(numG,P), ordinal(numG,P), Njs(numG), &
                   c1, c2, p1, Yi1Categorie, tellers(numG,maxCat,P), k1, p2, errorflag, &
                   lower_int, median_int, upper_int, priorDf
@@ -78,6 +79,9 @@ subroutine estimate_bct_ordinal(postZmean, postZcov, P, numcorr, K, numG, BHat, 
     CDraws = CHat
     meanO = 0.0_rdp
     gLiuSab_curr = 1.0_rdp
+    do g1=1,numG
+        call FINDInv(CDraws(g1,:,:),CcurrInv(g1,:,:),P,errorflag)
+    end do
 !
     do g1=1,numG
         do p1=1,P
@@ -98,14 +102,16 @@ subroutine estimate_bct_ordinal(postZmean, postZcov, P, numcorr, K, numG, BHat, 
         end do
     end do
 !
-    !set prior hyperparameters
-    if(priorchoice == 1) then
-        priorDf = -P-1
-        priorScale = 0
-    else
-        priorDf = P+1
-        priorScale = eye(P)
-    end if
+    !set prior hyperparameters. Only supprt for joint uniform prior
+    priorDf = 0 ! target prior as in Liu & Daniels
+    priorScale = 0.0_rdp
+!    if(priorchoice == 1) then
+!        priorDf = -P-1
+!        priorScale = 0
+!    else
+!        priorDf = P+1
+!        priorScale = eye(P)
+!    end if
 !
     !define nugget matrix to avoid approximate nonpositive definite correlation matrices for candidates
     Cnugget = nuggetscale
@@ -259,12 +265,18 @@ subroutine estimate_bct_ordinal(postZmean, postZcov, P, numcorr, K, numG, BHat, 
             call FINDInv(dummyPP,dummyPPinv,P,errorflag)
             Ccan = matmul(matmul(diag(1/sqrt(diagonals(dummyPPinv,P)),P),dummyPPinv), &
                 diag(1/sqrt(diagonals(dummyPPinv,P)),P))
-!            write(*,*)
-!            write(*,*)Ccan
             Ccan = Ccan * Cnugget
-            call FINDInv(Ccan,CcanInv,P,errorflag)
-            CDraws(g1,:,:) = Ccan(:,:)
-            Cinv = CcanInv
+            ! check acceptance of candidate via MH
+            logR_MH = 0.5*real(P+1,kind=rdp) * (log(det(Ccan,P,-1)) - log(det(Ccurr,P,-1)))
+            R_MH = exp(logR_MH)
+            rnunif = unif_rand()
+            if(rnunif < R_MH) then
+                CDraws(g1,:,:) = Ccan(:,:)
+                call FINDInv(Ccan,CcanInv,P,errorflag)
+                CcurrInv(g1,:,:) = CcanInv(:,:)
+                !acceptC(g1) = acceptC(g1) + 1
+            end if
+            Cinv(:,:) = CcurrInv(g1,:,:)
 
             !draw sigma's
             do p1 = 1,P
@@ -445,9 +457,17 @@ subroutine estimate_bct_ordinal(postZmean, postZcov, P, numcorr, K, numG, BHat, 
             Ccan = matmul(matmul(diag(1/sqrt(diagonals(dummyPPinv,P)),P),dummyPPinv), &
                 diag(1/sqrt(diagonals(dummyPPinv,P)),P))
             Ccan = Ccan * Cnugget
-            call FINDInv(Ccan,CcanInv,P,errorflag)
-            CDraws(g1,:,:) = Ccan(:,:)
-            Cinv = CcanInv
+            ! check acceptance of candidate via MH
+            logR_MH = 0.5*real(P+1,kind=rdp) * (log(det(Ccan,P,-1)) - log(det(Ccurr,P,-1)))
+            R_MH = exp(logR_MH)
+            rnunif = unif_rand()
+            if(rnunif < R_MH) then
+                CDraws(g1,:,:) = Ccan(:,:)
+                call FINDInv(Ccan,CcanInv,P,errorflag)
+                CcurrInv(g1,:,:) = CcanInv(:,:)
+                !acceptC(g1) = acceptC(g1) + 1
+            end if
+            Cinv(:,:) = CcurrInv(g1,:,:)
             do i1 = 1,P-1 !keep Fisher z transformed posterior draws of rho's
                 Zcorr_sample(s1,(corrteller+1):(corrteller+P-i1)) = .5*log((1+CDraws(g1,(1+i1):P,i1))/ &
                     (1-CDraws(g1,(1+i1):P,i1)))
