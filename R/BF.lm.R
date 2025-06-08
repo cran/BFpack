@@ -219,11 +219,13 @@ BF.lm <- function(x,
                            ub <- qt(p=CrI_UB,df=dfN)*sqrt(ScaleN[coef,coef])+meanN[coef,1]
                            lb <- qt(p=CrI_LB,df=dfN)*sqrt(ScaleN[coef,coef])+meanN[coef,1]
                            return(c(lb,ub))
-                         })),nrow=2))
+                         })),nrow=2)
+                         ),
+                         1-pt((0-meanN[,1])/sqrt(diag(ScaleN)),df=dfN)
   )
   row.names(postestimates) <- names_coef
   colnames(postestimates) <- c("mean","median",paste0(as.character(round(CrI_LB*100,7)),"%"),
-                               paste0(as.character(round(CrI_UB*100,7)),"%"))
+                               paste0(as.character(round(CrI_UB*100,7)),"%"),"Pr(>0)")
 
   # Additional exploratory tests of main effects and interaction effects
   # in the case of an aov type object
@@ -410,6 +412,11 @@ BF.lm <- function(x,
         interval_RrStack(rbind(RrE[[h]],RrO[[h]]))
       })
       RrStack <- do.call(rbind,RrStack_list)
+      RrStack <- interval_RrStack(RrStack)
+      # RrStack_list <- do.call(rbind,lapply(1:length(RrE),function(h){
+      #   rbind(RrE[[h]],RrO[[h]])
+      # }))
+      # RrStack <- interval_RrStack(RrStack_list)
     }
     if(nrow(RrStack)>1){
       RStack <- RrStack[,-(K*P+1)]
@@ -854,26 +861,29 @@ Student_measures <- function(mean1,Scale1,df1,RrE1,RrO1,names1=NULL,constraints1
       if(nrow(scaleO)==1){
         relO <- pt((rO1-meanO)/sqrt(scaleO[1,1]),df=df1,lower.tail=FALSE,log.p = TRUE)
       }else{
-        relO <- pmvt(lower=rO1,upper=Inf,delta=meanO,sigma=scaleO,df=df1,
-             type="shifted")[1]
+        relO <- pmvt(lower=rO1,upper=Inf,delta=meanO,sigma=scaleO,df=round(df1),
+                     type="shifted")[1]
         if(relO<0){relO <- 0}
         if(relO>1){relO <- 1}
         relO <- log(relO)
       }
-    }else{ #no linear transformation can be used; pmvt cannot be used. Use bain with a multivariate normal approximation
-      #compute covariance matrix for multivariate normal distribution
-      names(mean1) <- names1
-      if(df1>2){ # we need posterior measures
-        covm1 <- Scale1*df1/(df1-2)
-      }else if(df1==2){
-        covm1 <- Scale1*4
-      }else{
-        covm1 <- Scale1*5
-      }
-      mean1vec <- c(mean1)
-      names(mean1vec) <- names(mean1)
-      bain_res <- bain(x=mean1vec,hypothesis=constraints1,Sigma=covm1,n=999) #n not used in computation
-      relO <- log(bain_res$fit[1,3])
+    }else{ # no linear transformation is used; Use proportion of draws satisfying the constraints
+           # (bain was used before but is problematic with range constraints)
+
+      relO <- log(mean(apply((rmvt(n=1e6,sigma=Scale1,df=df1) + rep(1,1e6) %*% t(mean1)) %*%
+                               t(RO1) - rep(1,1e6) %*% t(rO1) > 0,1,prod)))
+      # names(mean1) <- names1
+      # if(df1>2){ # we need posterior measures
+      #   covm1 <- Scale1*df1/(df1-2)
+      # }else if(df1==2){
+      #   covm1 <- Scale1*4
+      # }else{
+      #   covm1 <- Scale1*5
+      # }
+      # mean1vec <- c(mean1)
+      # names(mean1vec) <- row.names(covm1) <-colnames(covm1) <- names(mean1)
+      # bain_res <- bain(x=mean1vec,hypothesis=constraints1,Sigma=covm1,n=999) #n not used in computation
+      # relO <- log(bain_res$fit[1,3])
     }
   }
   if(!is.null(RrE1) && !is.null(RrO1)){ #hypothesis with equality and order constraints
@@ -941,7 +951,7 @@ Student_measures <- function(mean1,Scale1,df1,RrE1,RrO1,names1=NULL,constraints1
                    log.p = TRUE)[1]
       } else { # multivariate
         relO <- pmvt(lower = rO1tilde, upper = Inf, delta = delta_trans, sigma = scale1_trans,
-                         df = df1+qE1, type = "shifted")[1]
+                         df = round(df1+qE1), type = "shifted")[1]
         if(relO<0){relO <- 0}
         if(relO>1){relO <- 1}
         relO <- log(relO)
@@ -1063,7 +1073,7 @@ Student_prob_Hc <- function(mean1,scale1,df1,relmeas1,constraints,RrO1=NULL){
     }else{ # So more than one hypothesis with only order constraints
       # First we check whether ther is an overlap between the order constrained spaces.
 
-      draws2 <- 1e4
+      draws2 <- 1e5
       randomDraws <- rmvnorm(draws2,mean=rep(0,numpara),sigma=diag(numpara))
       #get draws that satisfy the constraints of the separate order constrained hypotheses
       checksOC <- lapply(welk,function(h){

@@ -69,6 +69,7 @@ BF.rma.uni <- function(x,
     ptau2 <- -1/K*sum(log(vi+tau2.arg))
     #ptau2 <- .5*log(sum(1/(vi+tau2.arg)^2)) # Tibshirani (1989)
     #ptau2 <- 0 #uniform prior
+    #ptau2 <- -.5*log(tau2.arg) #right-Haar prior (e.g., Daniels, 1999)
     ifelse(log,ptau2,exp(ptau2))
     } # Berger & Deely (1988)
 
@@ -76,9 +77,9 @@ BF.rma.uni <- function(x,
   if(is(BF.type,"character")){
     if(BF.type == "stand.effect"){
       # conjugate normal prior assuming average effects of about .5
-      prior.mu <- function(x,tau2,log=FALSE){dnorm(x, mean = 0, sd = .5, log = log)}
+      prior.mu <- function(x,tau2,log=FALSE){dnorm(x, mean = 0, sd = 1, log = log)}
       prior.muGR0 <- .5
-      bayesfactor.name <- "Bayes factor based on a normal prior (mu ~ norm(mean=0, sd=0.5))"
+      bayesfactor.name <- "Bayes factor based on a normal prior (mu ~ norm(mean=0, sd=1))"
       parameter.name <- "standardized effect"
     }else if(BF.type == "log.odds"){
       # Student t prior which approximates the implied distribution of the log odds ratio based on uniform success probabilities
@@ -358,7 +359,7 @@ BF.rma.uni <- function(x,
 
 }
 
-#1. unconstrained sampling under marema using 'prior.mu' as prior for mu and a noninformative prior for tau in (prior.tau2,Inf)
+#1. unconstrained sampling under marema using 'prior.mu' as prior for mu and a noninformative prior for tau2 in (prior.tau2,Inf)
 gibbs_unc_prior <- function(yi, vi, tau2_min,
                             prior.mu, prior.tau2,
                             start_mu, start_tau2,
@@ -370,6 +371,8 @@ gibbs_unc_prior <- function(yi, vi, tau2_min,
   upper1 <- .5 # define region where the sdstep does not have to be changed
   lower1 <- .15
   sdsteptel <- 1
+  optimal1 <- .35
+  gamma1 <- function(prem) 1 / (prem + check1)^0.6
   #stretched beta prior for rho is a uniform: alpha1 = 1 & beta1 = 1
 
   #initialization
@@ -411,8 +414,9 @@ gibbs_unc_prior <- function(yi, vi, tau2_min,
     acceptMat[i,1] <- mu_star == mu
 
     #if needed update random walk sd depending on acceptance rate
-    if(ceiling(i/check1)==i/check1){
+    if(i %% check1 == 0){
       probs <- apply(as.matrix(acceptMat[(i-check1+1):i,]),2,mean)
+      # sdstep <- exp(log(sdstep) + gamma1(i) * (probs - optimal1))
       sdstep[probs>upper1] <- sdstep[probs>upper1] * ( (probs[probs>upper1]-upper1)/(1-upper1) + 1)
       sdstep[probs<lower1] <- sdstep[probs<lower1] * 1/( 2 - (probs[probs<lower1])/lower1 )
       # store sdstep
@@ -421,7 +425,99 @@ gibbs_unc_prior <- function(yi, vi, tau2_min,
     }
 
     store[i,] <- c(mu,tau2)
+    if(i > burnin){
+      check1 <- min(1e3,burnin)
+    }
+  }
 
+  return(list(postdraws = as.matrix(store[-(1:burnin),]), sdstepseq=sdstepseq))
+
+}
+gibbs_unc_prior1 <- function(yi, vi, tau2_min,
+                            prior.mu, prior.tau2,
+                            start_mu, start_tau2,
+                            sdstep.mu, sdstep.tau2,
+                            burnin, iters){
+
+  #check sd for random walk every 100 iterations
+  check1 <- 100
+  upper1 <- .5 # define region where the sdstep does not have to be changed
+  lower1 <- .2
+  sdsteptel <- 1
+  #stretched beta prior for rho is a uniform: alpha1 = 1 & beta1 = 1
+
+  # transform logtau2 to tau2
+  fun_logtau2TOtau2 <- function(logtau2.arg){
+    exp(logtau2.arg) + tau2_min
+  }
+
+  # implied prior for transformed parameter logtau2
+  prior.logtau2.func <- function(logtau2.arg,log=FALSE){
+
+    plogtau2 <- prior.tau2(fun_logtau2TOtau2(logtau2.arg),log=TRUE) + logtau2.arg
+
+    ifelse(log,plogtau2,exp(plogtau2))
+  }
+
+  #initialization
+  mu <- start_mu
+  draws.for.start.logtau2 <- log(rtnorm(1e4,mean=start_tau2,sd=sdstep.tau2,a=tau2_min) - tau2_min)
+  sdstep.logtau2 <- sd(draws.for.start.logtau2)
+  logtau2 <- mean(draws.for.start.logtau2)
+  # if(start_tau2 > tau2_min){
+  #   logtau2 <- log(start_tau2 - tau2_min)
+  # }else{
+  #   logtau2 <- log(sdstep.tau2 - tau2_min)
+  # }
+
+  cur_vars <- vi+fun_logtau2TOtau2(logtau2)
+  acceptMat <- matrix(0, nrow = iters + burnin, ncol = 2)
+  sdstepseq <- matrix(0, nrow = (iters + burnin) / check1, 2)
+  sdstep <- c(sdstep.mu, sdstep.logtau2)
+  store <- matrix(NA, ncol=2, nrow = iters + burnin)
+  colnames(store) <- colnames(acceptMat) <- colnames(sdstepseq) <- c("mu","tau2")
+
+  for(i in 1:(burnin+iters)){
+    #draw candidate logtau2 from a normal (tau2)
+    logtau2_star <- rnorm(1, mean = logtau2, sd = sdstep[2])
+
+    #evaluate Metropolis-Hastings acceptance probability
+    can_vars <- vi+fun_logtau2TOtau2(logtau2_star)
+    R_MH <- exp( sum(dnorm(yi,mean=mu,sd=sqrt(can_vars),log=TRUE)) -
+                   sum(dnorm(yi,mean=mu,sd=sqrt(cur_vars),log=TRUE)) +
+                   prior.mu(mu,fun_logtau2TOtau2(logtau2_star),log=TRUE) -
+                   prior.mu(mu,fun_logtau2TOtau2(logtau2),log=TRUE) +
+                   prior.logtau2.func(logtau2_star,log=TRUE) -
+                   prior.logtau2.func(logtau2,log=TRUE) )
+    logtau2 <- ifelse(runif(1) < R_MH, logtau2_star, logtau2)
+    acceptMat[i,2] <- logtau2_star == logtau2
+    cur_vars <- vi+fun_logtau2TOtau2(logtau2)
+
+    #draw mu
+    mu_star <- rnorm(1, mean = mu, sd = sdstep[1])
+    R_MH <- exp( sum(dnorm(yi,mean=mu_star,sd=sqrt(cur_vars),log=TRUE)) -
+                   sum(dnorm(yi,mean=mu,sd=sqrt(cur_vars),log=TRUE)) +
+                   prior.mu(mu_star,fun_logtau2TOtau2(logtau2),log=TRUE) -
+                   prior.mu(mu,fun_logtau2TOtau2(logtau2),log=TRUE)
+    )
+    mu <- ifelse(runif(1) < R_MH, mu_star, mu)
+    acceptMat[i,1] <- mu_star == mu
+
+    #if needed update random walk sd depending on acceptance rate
+    if((i <= burnin) && (i %% check1 == 0)){
+      probs <- apply(as.matrix(acceptMat[(i-check1+1):i,]),2,mean)
+      # sdstep <- exp(log(sdstep) + gamma1(i) * (probs - optimal1))
+      sdstep[probs>upper1] <- sdstep[probs>upper1] * ( (probs[probs>upper1]-upper1)/(1-upper1) + 1)
+      sdstep[probs<lower1] <- sdstep[probs<lower1] * 1/( 2 - (probs[probs<lower1])/lower1 )
+      # store sdstep
+      sdstepseq[sdsteptel,] <- sdstep
+      sdsteptel <- sdsteptel + 1
+    }
+
+    store[i,] <- c(mu,fun_logtau2TOtau2(logtau2))
+    # if(i > burnin){
+    #   check1 <- min(1e3,burnin)
+    # }
   }
 
   return(list(postdraws = as.matrix(store[-(1:burnin),]), sdstepseq=sdstepseq))
@@ -480,7 +576,89 @@ gibbs_cond.mu_prior <- function(yi, vi, tau2_min,
     }
 
     store[i,] <- c(tau2)
+  }
 
+  return(list(postdraws = as.matrix(store[-(1:burnin),]), sdstepseq=sdstepseq))
+
+}
+gibbs_cond.mu_prior1 <- function(yi, vi, tau2_min,
+                                muIN, prior.tau2,
+                                start_tau2, sdstep.tau2, burnin, iters){
+
+  #check sd for random walk every 100 iterations
+  check1 <- 100
+  upper1 <- .5 # define region where the sdstep does not have to be changed
+  lower1 <- .2
+  sdsteptel <- 1
+  # optimal1 <- .35
+  # gamma1 <- function(prem) 1 / (prem + check1)^0.6
+  #stretched beta prior for rho is a uniform: alpha1 = 1 & beta1 = 1
+
+  # transform logtau2 to tau2
+  fun_logtau2TOtau2 <- function(logtau2.arg){
+    exp(logtau2.arg) + tau2_min
+  }
+
+  # implied prior for transformed parameter logtau2
+  prior.logtau2.func <- function(logtau2.arg,log=FALSE){
+
+    plogtau2 <- prior.tau2(fun_logtau2TOtau2(logtau2.arg),log=TRUE) + logtau2.arg
+
+    ifelse(log,plogtau2,exp(plogtau2))
+  }
+
+  #initialization
+  draws.for.start.logtau2 <- log(rtnorm(1e4,mean=start_tau2,sd=sdstep.tau2,a=tau2_min) - tau2_min)
+  sdstep.logtau2 <- sd(draws.for.start.logtau2)
+  logtau2 <- mean(draws.for.start.logtau2)
+  # if(start_tau2 > tau2_min){
+  #   logtau2 <- log(start_tau2 - tau2_min)
+  # }else{
+  #   logtau2 <- log(sdstep.tau2 - tau2_min)
+  # }
+  mu <- muIN
+  # if(start_tau2>tau2_min){
+  #   tau2 <- start_tau2
+  # }else{
+  #   tau2 <- sdstep.tau2
+  # }
+  cur_vars <- vi+fun_logtau2TOtau2(logtau2)
+  acceptMat <- matrix(0, nrow = iters + burnin, ncol = 1)
+  sdstepseq <- matrix(0, nrow = (iters + burnin) / check1, 1)
+  sdstep <- sdstep.logtau2
+  store <- matrix(NA, ncol=1, nrow = iters + burnin)
+  store_check <- matrix(NA, ncol=2, nrow = iters + burnin)
+  colnames(store) <- colnames(acceptMat) <- colnames(sdstepseq) <- c("tau2")
+
+  for(i in 1:(burnin+iters)){
+    #draw rho
+    #draw candidate from truncated normal
+    logtau2_star <- rnorm(1, mean = logtau2, sd = sdstep)
+    store_check[i,] <- c(logtau2,logtau2_star)
+
+    #evaluate Metropolis-Hastings acceptance probability
+    can_vars <- vi+fun_logtau2TOtau2(logtau2_star)
+    R_MH <- exp( sum(dnorm(yi,mean=mu,sd=sqrt(can_vars),log=TRUE)) -
+                   sum(dnorm(yi,mean=mu,sd=sqrt(cur_vars),log=TRUE)) +
+                   prior.logtau2.func(logtau2_star,log=TRUE) -
+                   prior.logtau2.func(logtau2,log=TRUE)
+                 )
+    logtau2 <- ifelse(runif(1) < R_MH, logtau2_star, logtau2)
+    acceptMat[i,1] <- logtau2_star == logtau2
+    cur_vars <- vi+fun_logtau2TOtau2(logtau2)
+
+    #if needed update random walk sd depending on acceptance rate
+    if((i <= burnin) && (i %% check1 == 0)){
+      probs <- mean(as.matrix(acceptMat[(i-check1+1):i,]))
+#      sdstep <- exp(log(sdstep) + gamma1(i) * (probs - optimal1))
+      sdstep[probs>upper1] <- sdstep[probs>upper1] * ( (probs[probs>upper1]-upper1)/(1-upper1) + 1)
+      sdstep[probs<lower1] <- sdstep[probs<lower1] * 1/( 2 - (probs[probs<lower1])/lower1 )
+      # store sdstep
+      sdstepseq[sdsteptel,1] <- sdstep
+      sdsteptel <- sdsteptel + 1
+    }
+
+    store[i,] <- c(fun_logtau2TOtau2(logtau2))
   }
 
   return(list(postdraws = as.matrix(store[-(1:burnin),]), sdstepseq=sdstepseq))
@@ -531,7 +709,9 @@ gibbs_cond.tau_prior <- function(yi, vi, tau2IN,
     }
 
     store[i,] <- c(mu)
-
+    if(i > burnin){
+      check1 <- min(1e3,burnin)
+    }
     #print(c(mu,tau2,sdstep))
 
   }
@@ -548,11 +728,11 @@ log_marg_like_full <- function(yi, vi, tau2_min,
                                burnin, iters1, iters2){
 
   #estimate unconstrained marema model with proper prior for mu
-  unc.draws.marglike <- gibbs_unc_prior(yi, vi, tau2_min,
+  unc.draws.marglike <- gibbs_unc_prior1(yi, vi, tau2_min,
                                         prior.mu,
                                         prior.tau2,
                                         start_mu, start_tau2, sdstep.mu, sdstep.tau2,
-                                        burnin, iters1)
+                                        burnin, iters=iters1)
 
   #approximate posterior tau2 with a log normal for constructing proposal distribution
   para.tau2 <- fitdistr(unc.draws.marglike[[1]][,2]-tau2_min, "log-normal", lower = 0.0000001)$estimate
@@ -572,7 +752,7 @@ log_marg_like_full <- function(yi, vi, tau2_min,
       dnorm(draws.IS.mu[s], mean = para.mu.IS[1], sd = para.mu.IS[2],log=TRUE) -
       dlnorm(draws.IS.tau2[s]-tau2_min, meanlog = para.tau2.IS[1], sdlog = para.tau2.IS[2], log=TRUE)
   }))
-  logintegrands <- logintegrands[!is.na(logintegrands)]
+  logintegrands <- logintegrands[which(!is.na(logintegrands) & (abs(logintegrands)!=Inf) )]
 
   logmuu <- log(mean(exp(logintegrands-max(logintegrands)))) + max(logintegrands)
 
@@ -585,9 +765,9 @@ log_marg_like_cond.mu <- function(yi, vi, tau2_min,
                                   muIN, prior.tau2,
                                   start_tau2, sdstep.tau2, burnin, iters1, iters2){
 
-  draws.marglike.cond.mu <- gibbs_cond.mu_prior(yi, vi, tau2_min,
+  draws.marglike.cond.mu <- gibbs_cond.mu_prior1(yi, vi, tau2_min,
                                                 muIN, prior.tau2=prior.tau2,
-                                                start_tau2, sdstep.tau2, burnin, iters1)
+                                                start_tau2, sdstep.tau2, burnin, iters=iters1)
 
   #approximate posterior tau2 with a shifted log-normal as proposal distribution
   para.tau2 <- fitdistr(draws.marglike.cond.mu[[1]][,1]-tau2_min, "log-normal", lower = 0.000001)$estimate
@@ -600,7 +780,7 @@ log_marg_like_cond.mu <- function(yi, vi, tau2_min,
       prior.tau2(draws.IS.tau2[s],log=TRUE) -
       dlnorm(draws.IS.tau2[s]-tau2_min, meanlog = para.tau2.IS[1], sdlog = para.tau2.IS[2], log=TRUE)
   }))
-  logintegrands <- logintegrands[!is.na(logintegrands)]
+  logintegrands <- logintegrands[which(!is.na(logintegrands) & (abs(logintegrands)!=Inf) )]
   logmuu_cond.mu <- log(mean(exp(logintegrands-max(logintegrands)))) + max(logintegrands)
 
   return(list(log.marg.like = logmuu_cond.mu, post.draws = draws.marglike.cond.mu[[1]], sdstepseq = draws.marglike.cond.mu[[2]]))
@@ -645,6 +825,7 @@ BF_rma.uni <- function(x,
                        prior.hyp = NULL,
                        complement = TRUE,
                        log = FALSE,
+                       cov.prob = .95,
                        BF.type,
                        prior.tau2 = 1,
                        iter = 2e4,
@@ -660,6 +841,12 @@ BF_rma.uni <- function(x,
   if(!is.null(hypothesis)){
     message("Note that confirmatory testing via the 'hypothesis' argument is currently not supported for object of class 'rma.uni'.")
   }
+  if(!(cov.prob>0 & cov.prob<1)){
+    stop("The argument 'cov.prob' is a coverage probability for the interval estimates that
+         should lie between 0 and 1. The default is 0.95.")
+  }
+  CrI_LB <- (1 - cov.prob)/2
+  CrI_UB <- 1 - (1 - cov.prob)/2
 
   if(!exists("BF.type")){
     stop("The argument 'BF.type' is missing. See documentation. See ?BF")
@@ -688,85 +875,126 @@ BF_rma.uni <- function(x,
   est.tau2 <- x$tau2
   se.tau2 <- x$se.tau2 # check if we can use it as step sd for posterior sampling of tau
   if(is.na(se.tau2)){se.tau2 <- .5}
-  tau2.min <- -min(vi)
+  nugget_boundary <- 1e-6
+  tau2.min <- -min(vi) + nugget_boundary
 
-  # prior tau2
+  if(length(BF.type)==1){
+    prior.tau2.func <- function(tau2.arg,log=FALSE){
+      ptau2 <- -.5 * log(abs(tau2.arg))
+      ifelse(log,ptau2,exp(ptau2))
+    }
+    if(is(BF.type,"character")){
+      if(BF.type == "stand.effect"){
+        # conjugate normal prior assuming average effects of about .5
+        prior.mu <- function(x,tau2,log=FALSE){dnorm(x, mean = 0, sd = 1, log = log)}
+        prior.muGR0 <- .5
+        bayesfactor.name <- "Bayes factor based on a normal prior (mu ~ norm(mean=0, sd=1)) and invariant right Haar prior for tau^2"
+        parameter.name <- "standardized effect"
+      }else if(BF.type == "log.odds"){
+        # Student t prior which approximates the implied distribution of the log odds ratio based on uniform success probabilities
+        prior.mu <- function(x,tau2,log=FALSE){
+          dt1 <- dt(x/2.36,df=13.1,log=TRUE)-log(2.36)
+          ifelse(log,dt1,exp(dt1))
+        }
+        prior.muGR0 <- .5
+        bayesfactor.name <- "Bayes factor based on uniform priors for success probabilities (log.odds ~ t(0,2.36,13.1)) and invariant right Haar prior for tau^2."
+        parameter.name <- "log odds"
+      }else if(BF.type == "correlation"){
+        # logistic prior for the Fisher transformed correlation corresponding to a uniform prior for the correlation in (-1,1)
+        prior.mu <- function(x,tau2,log=FALSE){dlogis(x, scale = .5, log = log)}
+        prior.muGR0 <- .5
+        bayesfactor.name <- "Bayes factor based on a uniform prior for the correlation in (-1,1) (Fisher(cor)~logis(0.5)) and invariant right Haar prior for tau^2."
+        parameter.name <- "Fisher transformed correlation"
+      }else if(BF.type == "unit.info"){
+        if(N==0){
+          stop("In order to use a unit-information prior, the sample sizes need to be part of the element 'ni'
+              of the 'rma.uni' object (e.g., using the 'ni' argument of the 'rma' function).")
+        }
+        prior.mu <- function(x,tau2,log=FALSE){dnorm(x, mean = 0, sd = sqrt(N/sum(1/(vi+tau2))), log = log)}
+        prior.muGR0 <- .5
+        bayesfactor.name <- "Bayes factor based on unit information prior."
+        parameter.name <- "mean parameter"
+      }else{
+        stop("The argument 'BF.type' is not correctly specified for an object of type 'rma.uni'. See documentation. ?BF")
+      }
+    }else if(is(BF.type,"prior")){
+      prior.mu <- function(x,tau2,log=FALSE){BF.type(x,log)}
+      seq1 <- seq(0,1e3,length=1e5)
+      seq1 <- seq1+(seq1[2]-seq1[1])/2
+      prior.muGR0 <- sum(prior.mu(seq1,0))*(seq1[2]-seq1[1]) #riemann estimate of prior prob that mu > 0.
+      bayesfactor.name <- paste0("Bayes factor based on manually chosen prior")
+      parameter.name <- "general parameter"
+      message("Be sure that the specified prior is not truncated in a specific interval.")
+    }else{
+      stop("The argument 'BF.type' is not correctly specified for an object of type 'rma.uni'. See documentation. ?BF")
+    }
+  }else if(length(BF.type)==2){
+    # both elements of BF.type should be of class 'prior' (from metaBMA package)
+    # first element of BF.type is the prior for the mean
+    # section element of BF.type is the prior for tau^2
+    if( is(BF.type[[1]],"prior") & is(BF.type[[2]],"prior") ){
+
+      prior.mu <- function(x,tau2,log=FALSE){BF.type[[1]](x,log)}
+      seq1 <- seq(0,1e3,length=1e5)
+      seq1 <- seq1+(seq1[2]-seq1[1])/2
+      prior.muGR0 <- sum(prior.mu(seq1,0))*(seq1[2]-seq1[1]) #riemann estimate of prior prob that mu > 0.
+      bayesfactor.name <- paste0("Bayes factor based on manually chosen prior")
+      parameter.name <- "general parameter"
+      message("The prior for the mean should not be truncated in a specific interval.")
+      prior.tau2.func <- function(tau2.arg,log=FALSE){
+        #ptau2 <- -1/K*sum(log(vi+tau2.arg))
+        #ptau2 <- .5*log(sum(1/(vi+tau2.arg)^2)) # Tibshirani (1989)
+        #ptau2 <- 0 #uniform prior
+        ptau2 <- BF.type[[2]](tau2.arg,log=TRUE) # the right Haar prior for tau^2 is used by default
+        ifelse(log,ptau2,exp(ptau2))
+      }
+    }else{
+      stop("The argument 'BF.type' is not correctly specified for an object of type 'rma.uni'. See documentation. ?BF")
+    }
+  }else{
+    stop("The argument 'BF.type' is not correctly specified for an object of type 'rma.uni'. See documentation. ?BF")
+  }
+
+  # try different improper priors for tau2
   if(prior.tau2 == 1){
-    prior.tau2.Jeffreys1 <- function(tau2.arg,log=FALSE){
+    prior.tau2.func <- prior.tau2.func.RE <- function(tau2.arg,log=FALSE){
       ptau2 <- -1/K*sum(log(vi+tau2.arg))
       #ptau2 <- .5*log(sum(1/(vi+tau2.arg)^2)) # Tibshirani (1989)
       #ptau2 <- 0 #uniform prior
       ifelse(log,ptau2,exp(ptau2))
     }
   }else if(prior.tau2 == 2){
-    prior.tau2.Jeffreys1 <- function(tau2.arg,log=FALSE){
-      #ptau2 <- -1/K*sum(log(vi+tau2.arg))
-      ptau2 <- .5*log(sum(1/(vi+tau2.arg)^2)) # Tibshirani (1989)
-      #ptau2 <- 0 #uniform prior
-      ifelse(log,ptau2,exp(ptau2))
-    }
-  }else if(prior.tau2 == 3){
-    prior.tau2.Jeffreys1 <- function(tau2.arg,log=FALSE){
+    prior.tau2.func <- prior.tau2.func.RE <- function(tau2.arg,log=FALSE){
       #ptau2 <- -1/K*sum(log(vi+tau2.arg))
       #ptau2 <- .5*log(sum(1/(vi+tau2.arg)^2)) # Tibshirani (1989)
       ptau2 <- 0 #uniform prior
       ifelse(log,ptau2,exp(ptau2))
     }
-  }else{
-    prior.tau2.Jeffreys1 <- function(tau2.arg,log=FALSE){
+  }else if(prior.tau2 == 3){
+    prior.tau2.func <- prior.tau2.func.RE <- function(tau2.arg,log=FALSE){
       #ptau2 <- -1/K*sum(log(vi+tau2.arg))
       #ptau2 <- .5*log(sum(1/(vi+tau2.arg)^2)) # Tibshirani (1989)
       #ptau2 <- 0 #uniform prior
-      #ptau2 <- dnorm(tau2.arg,mean=tau2.min,sd=1e3,log=log) * 2
-      ptau2 <- tau2.arg - tau2.min
+      ptau2 <- -.5 * log(abs(tau2.arg))
       ifelse(log,ptau2,exp(ptau2))
     }
-  }
-
-  if(is(BF.type,"character")){
-    if(BF.type == "stand.effect"){
-      # conjugate normal prior assuming average effects of about .5
-      prior.mu <- function(x,tau2,log=FALSE){dnorm(x, mean = 0, sd = .5, log = log)}
-      prior.muGR0 <- .5
-      bayesfactor.name <- "Bayes factor based on a normal prior (mu ~ norm(mean=0, sd=0.5))"
-      parameter.name <- "standardized effect"
-    }else if(BF.type == "log.odds"){
-      # Student t prior which approximates the implied distribution of the log odds ratio based on uniform success probabilities
-      prior.mu <- function(x,tau2,log=FALSE){
-        dt1 <- dt(x/2.36,df=13.1,log=log)-log(2.36)
-        ifelse(log,dt1,exp(dt1))
-      }
-      prior.muGR0 <- .5
-      bayesfactor.name <- "Bayes factor based on uniform priors for success probabilities (log.odds ~ t(0,2.36,13.1))."
-      parameter.name <- "log odds"
-    }else if(BF.type == "correlation"){
-      # logistic prior for the Fisher transformed correlation corresponding to a uniform prior for the correlation in (-1,1)
-      prior.mu <- function(x,tau2,log=FALSE){dlogis(x, scale = .5, log = log)}
-      prior.muGR0 <- .5
-      bayesfactor.name <- "Bayes factor based on a uniform prior for the correlation in (-1,1) (Fisher(cor)~logis(0.5))."
-      parameter.name <- "correlation"
-    }else if(BF.type == "unit.info"){
-      if(N==0){
-        stop("In order to use a unit-information prior, the sample sizes need to be part of the element 'ni'
-              of the 'rma.uni' object (e.g., using the 'ni' argument of the 'rma' function).")
-      }
-      prior.mu <- function(x,tau2,log=FALSE){dnorm(x, mean = 0, sd = sqrt(N/sum(1/(vi+tau2))), log = log)}
-      prior.muGR0 <- .5
-      bayesfactor.name <- "Bayes factor based on unit information prior."
-      parameter.name <- "general parameter"
-    }else{
-      stop("The argument 'BF.type' is not correctly specified for an object of type 'rma.uni'. See documentation. ?BF")
+  }else if(prior.tau2 == 4){
+    prior.tau2.func <- function(tau2.arg,log=FALSE){
+      #ptau2 <- -1/K*sum(log(vi+tau2.arg))
+      #ptau2 <- .5*log(sum(1/(vi+tau2.arg)^2)) # Tibshirani (1989)
+      #ptau2 <- 0 #uniform prior
+      #ptau2 <- -.5 * log(abs(tau2.arg))
+      ptau2 <- dinvgamma(sqrt(tau2.arg-tau2.min),alpha=1,beta=.15,log=TRUE) + log(.5) -.5 * log(tau2.arg-tau2.min)
+      ifelse(log,ptau2,exp(ptau2))
     }
-  }else if(is(BF.type,"prior")){
-    prior.mu <- function(x,tau2,log=FALSE){BF.type(x,log)}
-    seq1 <- seq(0,1e3,length=1e5)
-    seq1 <- seq1+(seq1[2]-seq1[1])/2
-    prior.muGR0 <- sum(prior.mu(seq1,0))*(seq1[2]-seq1[1]) #riemann estimate of prior prob that mu > 0.
-    bayesfactor.name <- paste0("Bayes factor based on manually chosen prior")
-    parameter.name <- "general parameter"
-    message("Be sure that the specified prior is not truncated in a specific interval")
-  }else{
-    stop("The argument 'BF.type' is not correctly specified for an object of type 'rma.uni'. See documentation. ?BF")
+    prior.tau2.func.RE <- function(tau2.arg,log=FALSE){
+      #ptau2 <- -1/K*sum(log(vi+tau2.arg))
+      #ptau2 <- .5*log(sum(1/(vi+tau2.arg)^2)) # Tibshirani (1989)
+      #ptau2 <- 0 #uniform prior
+      #ptau2 <- -.5 * log(abs(tau2.arg))
+      ptau2 <- dinvgamma(sqrt(tau2.arg),alpha=1,beta=.15,log=TRUE) + log(.5) -.5 * log(tau2.arg)
+      ifelse(log,ptau2,exp(ptau2))
+    }
   }
 
   #exploratory testing
@@ -780,20 +1008,23 @@ BF_rma.uni <- function(x,
     sdstep.mu <- x$se
     start_tau2 <- ifelse(x$tau2>0, x$tau2,.05)
     sdstep.tau2 <- x$se.tau2
+    if(is.na(sdstep.tau2)){
+      sdstep.tau2 <- 1
+    }
 
-    # marginal likelihood full unconstrained model. marema.unc.post.draws
+    # marginal likelihood full unconstrained model
     marg.like.marema.full <- log_marg_like_full(yi, vi, tau2_min=tau2.min,
                                                 prior.mu=prior.mu,
-                                                prior.tau2=prior.tau2.Jeffreys1,
+                                                prior.tau2=prior.tau2.func,
                                                 start_mu=start_mu, start_tau2=start_tau2,
                                                 sdstep.mu=sdstep.mu, sdstep.tau2=sdstep.tau2,
                                                 burnin = round(iter/2), iters1=iter, iters2=iter)
 
     # marginal likelihood under mu = 0
     marg.like.marema.muEQ0 <- log_marg_like_cond.mu(yi, vi, tau2_min=tau2.min,
-                                                    muIN=0, prior.tau2=prior.tau2.Jeffreys1,
+                                                    muIN=0, prior.tau2=prior.tau2.func,
                                                     start_tau2=start_tau2+start_mu^2, sdstep.tau2=sdstep.tau2,
-                                                    burnin=iter, iters1=iter, iters2=iter)
+                                                    burnin=round(iter/2), iters1=iter, iters2=iter)
 
     # marginal likelihoods when constraining mu
     # mu = 0
@@ -806,17 +1037,17 @@ BF_rma.uni <- function(x,
     #### random effects MODEL
 
     # marginal likelihood full unconstrained model
-    marg.like.ranef.full <- log_marg_like_full(yi, vi, tau2_min=0,
+    marg.like.ranef.full <- log_marg_like_full(yi, vi, tau2_min=0+nugget_boundary,
                                                prior.mu = prior.mu,
-                                               prior.tau2 = prior.tau2.Jeffreys1,
-                                               start_mu = start_mu, start_tau2 = ifelse(start_tau2<0,sdstep.tau2,start_tau2),
+                                               prior.tau2 = prior.tau2.func.RE,
+                                               start_mu = start_mu, start_tau2 = start_tau2,
                                                sdstep.mu = sdstep.mu, sdstep.tau2 = sdstep.tau2,
                                                burnin=round(iter/2), iters1=iter, iters2=iter)
 
     # marginal likelihood under mu = 0
-    marg.like.ranef.muEQ0 <- log_marg_like_cond.mu(yi, vi, tau2_min=0,
-                                                   muIN=0, prior.tau2=prior.tau2.Jeffreys1,
-                                                   start_tau2=ifelse(start_tau2<0,sdstep.tau2,start_tau2)+start_mu^2, sdstep.tau2=sdstep.tau2,
+    marg.like.ranef.muEQ0 <- log_marg_like_cond.mu(yi, vi, tau2_min=0+nugget_boundary,
+                                                   muIN=0, prior.tau2=prior.tau2.func.RE,
+                                                   start_tau2=start_tau2+start_mu^2, sdstep.tau2=sdstep.tau2,
                                                    burnin = round(iter/2), iters1=iter, iters2=iter)
 
     marg.like.ranef.muEQ0 <- marg.like.ranef.muEQ0[[1]]
@@ -869,7 +1100,9 @@ BF_rma.uni <- function(x,
                              apply(marg.like.ranef.full$post.draws,2,quantile,.975),
                              apply(marg.like.ranef.full$post.draws,2,function(x){mean(x>0)}))
     row.names(estimates_ranef) <- c("mu      (ranef)", "tau2    (ranef)")
-    colnames(estimates_marema) <- colnames(estimates_ranef) <- c("mean","median","2.5%","97.5%","Pr(>0)")
+    colnames(estimates_marema) <- colnames(estimates_ranef) <- #c("mean","median","2.5%","97.5%","Pr(>0)")
+      c("mean","median",paste0(as.character(round(CrI_LB*100,7)),"%"),
+        paste0(as.character(round(CrI_UB*100,7)),"%"),"Pr(>0)")
     uncestimates <- estimates_marema
     # estimates of separate group means
     #under marema model
@@ -883,7 +1116,7 @@ BF_rma.uni <- function(x,
       mean_s <- (yi[s]/vi[s] + mudraws_trunc/tau2draws_trunc) * var_s
       draws_s <- c(rnorm(length(mudraws_trunc),mean=mean_s,sd=sqrt(var_s)),
                    marema_post.draws_mu[marema_post.draws_tau2<0])
-      c(draws_s,mean(draws_s),median(draws_s),quantile(draws_s,.025),quantile(draws_s,.975),mean(draws_s>0))
+      c(draws_s,mean(draws_s),median(draws_s),quantile(draws_s,CrI_LB),quantile(draws_s,CrI_UB),mean(draws_s>0))
     }))
     uncestimates <- rbind(uncestimates,t(mudraws_studies[length(marema_post.draws_mu)+1:5,]))
     row.names(uncestimates)[-(1:2)] <- paste0("theta_",1:ncol(mudraws_studies)," (marema)")
@@ -895,7 +1128,7 @@ BF_rma.uni <- function(x,
       var_s <- 1/(1/vi[s] + 1/ranef_post.draws_tau2)
       mean_s <- (yi[s]/vi[s] + ranef_post.draws_mu/ranef_post.draws_tau2) * var_s
       draws_s <- rnorm(length(ranef_post.draws_mu),mean=mean_s,sd=sqrt(var_s))
-      c(draws_s,mean(draws_s),median(draws_s),quantile(draws_s,.025),quantile(draws_s,.975),mean(draws_s>0))
+      c(draws_s,mean(draws_s),median(draws_s),quantile(draws_s,CrI_LB),quantile(draws_s,CrI_UB),mean(draws_s>0))
     }))
     uncestimates <- rbind(uncestimates,t(mudraws_studies[length(ranef_post.draws_mu)+1:5,]))
     row.names(uncestimates)[-(1:(4+length(vi)))] <- paste0("theta_",1:ncol(mudraws_studies)," (ranef)")
@@ -937,9 +1170,10 @@ BF_rma.uni <- function(x,
 
     #descriptives of estimates
     uncestimates <- cbind(mean(marg.like.comef.muEQ0$post.draws), median(marg.like.comef.muEQ0$post.draws),
-                          quantile(marg.like.comef.muEQ0$post.draws,.025),quantile(marg.like.comef.muEQ0$post.draws,.975),
+                          quantile(marg.like.comef.muEQ0$post.draws,CrI_LB),quantile(marg.like.comef.muEQ0$post.draws,CrI_UB),
                           mean(marg.like.comef.muEQ0$post.draws>0))
-    colnames(uncestimates) <- c("mean","median","2.5%","97.5%","Pr(>0)")
+    colnames(uncestimates) <- c("mean","median",paste0(as.character(round(CrI_LB*100,7)),"%"),
+                                paste0(as.character(round(CrI_UB*100,7)),"%"),"Pr(>0)")
     row.names(uncestimates) <- "mu"
 
     #store posterior draws based on noninformative improper prior
