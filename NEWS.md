@@ -1,3 +1,16 @@
+# BFpack 1.5.3
+
+* cor_test() now uses LKJ's onion method as default sampler. method argument added.
+
+# BFpack 1.5.2
+
+* Bartlett's test for spericity (all correlations are zero) added.
+
+# BFpack 1.5.1
+
+* Version update of BF.rma.uni for a new publication on Bayes factors for meta-analyses.
+* Minor changes, bug fixes
+
 # BFpack 1.5.0
 
 * Version part of publication of a tutorial paper in JASP.
@@ -6,7 +19,7 @@
 # BFpack 1.4.1
 
 * Date: 2025-02-09
-* Bug fit of MCMC sampler for correlation test.
+* Bug fix of MCMC sampler for correlation test.
 
 # BFpack 1.4.0
 

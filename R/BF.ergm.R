@@ -1,8 +1,6 @@
 #BF method for ergm class
 
-#' @importFrom sandwich sandwich
 #' @importFrom ergm ergmMPLE
-#' @importFrom stats as.formula
 #' @importFrom Bergm bergm
 #' @method BF ergm
 #' @export

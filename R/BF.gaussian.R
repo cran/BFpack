@@ -110,11 +110,12 @@ Savage.Dickey.Gaussian <- function(prior.mean,
                            ub <- qnorm(p=.975)*sqrt(covmN[coef,coef])+meanN[coef]
                            lb <- qnorm(p=.025)*sqrt(covmN[coef,coef])+meanN[coef]
                            return(c(lb,ub))
-                         })),nrow=2))
+                         })),nrow=2)),
+                         1-pnorm(0,mean=meanN,sd=sqrt(diag(covmN)))
   )
   row.names(postestimates) <- names_coef
   colnames(postestimates) <- c("mean","median",paste0(as.character(round(CrI_LB*100,7)),"%"),
-                               paste0(as.character(round(CrI_UB*100,7)),"%"))
+                               paste0(as.character(round(CrI_UB*100,7)),"%"),"Pr(>0)")
 
   if(logIN == FALSE){
     BFtu_exploratory <- exp(BFtu_exploratory)
@@ -214,7 +215,7 @@ Savage.Dickey.Gaussian <- function(prior.mean,
     PHP_confirmatory <- round(exp(BFtu_confirmatory-maxBFtu)*priorprobs /
                                 sum(exp(BFtu_confirmatory-maxBFtu)*priorprobs),3)
     BFtable <- cbind(relcomp,relfit,relfit[,1]-relcomp[,1],relfit[,2]-relcomp[,2],
-                     exp(apply(relfit,1,sum)-apply(relcomp,1,sum)),PHP_confirmatory)
+                     apply(relfit,1,sum)-apply(relcomp,1,sum),PHP_confirmatory)
     BFtable[,1:7] <- exp(BFtable[,1:7])
     row.names(BFtable) <- names(PHP_confirmatory)
     colnames(BFtable) <- c("complex=","complex>","fit=","fit>","BF=","BF>","BF","PHP")

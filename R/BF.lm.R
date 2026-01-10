@@ -184,7 +184,7 @@ BF.lm <- function(x,
   }
   # posterior hyperparameters
   dfN <- N-K-P+1
-  ScaleN <- kronecker(S,tXXi)/(N-K-P+1) # off-diagonal elements have no meaning
+  ScaleN <- kronecker(S,tXXi)/(N-K-P+1)
   meanN <- as.matrix(c(BetaHat))
   row.names(meanN) <- row.names(mean0) <- names_coef
 
@@ -213,7 +213,7 @@ BF.lm <- function(x,
   PHP_exploratory <- norm_BF_explo / apply(norm_BF_explo,1,sum)
   colnames(PHP_exploratory) <- c("p(=0)","Pr(<0)","Pr(>0)")
 
-  #compute estimates
+  #compute estimates (test)
   postestimates <- cbind(meanN,meanN,
                          t(matrix(unlist(lapply(1:length(meanN),function(coef){
                            ub <- qt(p=CrI_UB,df=dfN)*sqrt(ScaleN[coef,coef])+meanN[coef,1]
