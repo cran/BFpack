@@ -12,7 +12,7 @@
 
 <meta name="author" content="Mulder, J., Williams, D. R., Gu, X., Tomarken, A., Boeing-Messing, F., Olsson-Collentine, A., Meijerink, M., Menke, J., van Aert, R., Fox, J.-P., Hoijtink, H., Rosseel, Y., Wagenmakers, E.-J., and van Lissa, C." />
 
-<meta name="date" content="2026-01-08" />
+<meta name="date" content="2026-04-13" />
 
 <title>Introduction to BFpack</title>
 
@@ -50,8 +50,9 @@ overflow: visible;
 }
 </style>
 <style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -62,7 +63,7 @@ div.sourceCode { overflow: auto; }
 }
 @media print {
 pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
 }
 pre.numberSource code
 { counter-reset: source-line 0; }
@@ -343,7 +344,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 Boeing-Messing, F., Olsson-Collentine, A., Meijerink, M., Menke, J., van
 Aert, R., Fox, J.-P., Hoijtink, H., Rosseel, Y., Wagenmakers, E.-J., and
 van Lissa, C.</h4>
-<h4 class="date">2026-01-08</h4>
+<h4 class="date">2026-04-13</h4>
 
 
 
@@ -849,18 +850,50 @@ effects model.</p>
 model, this needs to be specified when fitting the initial meta-analytic
 model:</p>
 <div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" tabindex="-1"></a>res2 <span class="ot">&lt;-</span> metafor<span class="sc">::</span><span class="fu">rma</span>(<span class="at">yi =</span> yi, <span class="at">vi =</span> vi, <span class="at">method =</span> <span class="st">&quot;EE&quot;</span>)</span>
-<span id="cb31-2"><a href="#cb31-2" tabindex="-1"></a>BFmeta2 <span class="ot">&lt;-</span> <span class="fu">BF</span>(res2, <span class="at">BF.type =</span> <span class="st">&quot;stand.effect&quot;</span>)</span></code></pre></div>
+<span id="cb31-2"><a href="#cb31-2" tabindex="-1"></a>BFmeta2 <span class="ot">&lt;-</span> <span class="fu">BF</span>(res2, <span class="at">BF.type =</span> <span class="st">&quot;stand.effect&quot;</span>)</span>
+<span id="cb31-3"><a href="#cb31-3" tabindex="-1"></a><span class="fu">print</span>(BFmeta2)</span></code></pre></div>
 <p>For more information about the methodology, we refer the interested
 reader to <a href="https://link.springer.com/article/10.3758/s13423-021-01918-9">Van
-Aert and Mulder (2021)</a> and Mulder and van Aert (in prep.).</p>
+Aert and Mulder (2021)</a> and <a href="https://doi.org/10.1017/rsm.2025.10060">Mulder and van Aert
+(2025)</a>.</p>
 </div>
 <div id="exponential-random-graph-models" class="section level3">
 <h3>Exponential random graph models</h3>
-<p>…</p>
-</div>
-<div id="network-autocorrelation-models" class="section level3">
-<h3>Network autocorrelation models</h3>
-<p>…</p>
+<p><code>BFpack</code> can be used for Bayes factor testing of the
+coefficients in an exponential random graph model (ERGM). As input the
+<code>BF()</code> function requires a fitted ERGM either from the
+<code>ergm</code> package or the <code>Bergm</code> package. Bayes
+factors are then computed using a so-called unit-information prior. For
+an ERGM, this prior contains the information of single dyad. Moreover,
+the prior is centered at 0. For Bayes factor testing, this prior is
+preferred to an arbitrarily vague prior (Mulder, Friel, &amp; Leifeld,
+2024). For this illustration, we use the <code>florentine</code> data
+from the <code>ergm</code> package and we fit the following ERGM:</p>
+<div class="sourceCode" id="cb32"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" tabindex="-1"></a><span class="fu">library</span>(ergm)</span>
+<span id="cb32-2"><a href="#cb32-2" tabindex="-1"></a>seed <span class="ot">&lt;-</span> <span class="dv">123</span></span>
+<span id="cb32-3"><a href="#cb32-3" tabindex="-1"></a><span class="co"># load florentine data</span></span>
+<span id="cb32-4"><a href="#cb32-4" tabindex="-1"></a><span class="fu">data</span>(florentine)</span>
+<span id="cb32-5"><a href="#cb32-5" tabindex="-1"></a>ergm_fit <span class="ot">&lt;-</span> <span class="fu">ergm</span>(flomarriage <span class="sc">~</span> edges <span class="sc">+</span></span>
+<span id="cb32-6"><a href="#cb32-6" tabindex="-1"></a>  <span class="fu">kstar</span>(<span class="dv">2</span>) <span class="sc">+</span></span>
+<span id="cb32-7"><a href="#cb32-7" tabindex="-1"></a>  <span class="fu">absdiff</span>(<span class="st">&quot;wealth&quot;</span>),</span>
+<span id="cb32-8"><a href="#cb32-8" tabindex="-1"></a>  <span class="at">control =</span> <span class="fu">control.ergm</span>(<span class="at">seed =</span> seed))</span></code></pre></div>
+<p>A Bayes factor is computed for a traditional two-sided test of
+whether the absolute difference in wealth between two families affects
+tie formation.</p>
+<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>)</span>
+<span id="cb33-2"><a href="#cb33-2" tabindex="-1"></a>BFergm <span class="ot">&lt;-</span> <span class="fu">BF</span>(ergm_fit,</span>
+<span id="cb33-3"><a href="#cb33-3" tabindex="-1"></a>  <span class="at">hypothesis =</span> <span class="st">&quot;absdiff.wealth = 0&quot;</span>,</span>
+<span id="cb33-4"><a href="#cb33-4" tabindex="-1"></a>  <span class="at">main.iters =</span> <span class="dv">500</span>)</span>
+<span id="cb33-5"><a href="#cb33-5" tabindex="-1"></a><span class="fu">print</span>(BFergm)</span></code></pre></div>
+<p>The null hypothesis is not supported give the Bayes factor of 9.36 in
+favor of the two-sided alternative, and given the posterior probability
+of 0.097 for the null.</p>
+<p>Finally note that one could retrieve the employed unit-information
+prior from the <code>BF</code> object:</p>
+<div class="sourceCode" id="cb34"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" tabindex="-1"></a>BFergm<span class="sc">$</span>prior.parameters</span></code></pre></div>
+<p>For more information about the methodology, we refer the interested
+reader to <a href="https://doi.org/10.1016/j.socnet.2023.11.004">Mulder,
+Friel, and Leifeld (2024)</a>.</p>
 </div>
 <div id="hypothesis-testing-using-normal-approximations" class="section level3">
 <h3>Hypothesis testing using normal approximations</h3>
@@ -894,21 +927,21 @@ sample size <code>n</code>.</p>
 <p>An example hypothesis test is considered under a logistic regression
 model. First a logistic regression model is fitted using the
 <code>glm</code> function</p>
-<div class="sourceCode" id="cb32"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" tabindex="-1"></a>fit_glm <span class="ot">&lt;-</span> <span class="fu">glm</span>(sent <span class="sc">~</span> ztrust <span class="sc">+</span> zfWHR <span class="sc">+</span> zAfro <span class="sc">+</span> glasses <span class="sc">+</span> attract <span class="sc">+</span> maturity <span class="sc">+</span></span>
-<span id="cb32-2"><a href="#cb32-2" tabindex="-1"></a>               tattoos, <span class="at">family =</span> <span class="fu">binomial</span>(), <span class="at">data =</span> wilson)</span></code></pre></div>
+<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" tabindex="-1"></a>fit_glm <span class="ot">&lt;-</span> <span class="fu">glm</span>(sent <span class="sc">~</span> ztrust <span class="sc">+</span> zfWHR <span class="sc">+</span> zAfro <span class="sc">+</span> glasses <span class="sc">+</span> attract <span class="sc">+</span> maturity <span class="sc">+</span></span>
+<span id="cb35-2"><a href="#cb35-2" tabindex="-1"></a>               tattoos, <span class="at">family =</span> <span class="fu">binomial</span>(), <span class="at">data =</span> wilson)</span></code></pre></div>
 <p>By default exploratory exhaustive tests are executed of whether the
 separate regression coefficients are zero, negative, or positive:</p>
-<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" tabindex="-1"></a><span class="fu">BF</span>(fit_glm)</span></code></pre></div>
+<div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a><span class="fu">BF</span>(fit_glm)</span></code></pre></div>
 <p>The names of the regression coefficients on which constrained
 hypotheses can be formualted can be extracted using the
 <code>get_estimates</code> function.</p>
-<div class="sourceCode" id="cb34"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" tabindex="-1"></a><span class="fu">get_estimates</span>(fit_glm)</span></code></pre></div>
+<div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" tabindex="-1"></a><span class="fu">get_estimates</span>(fit_glm)</span></code></pre></div>
 <p>Two different hypotheses are formulated with competing equality
 and/or order constraints on the regression coefficients of interest <a href="https://www.jstatsoft.org/article/view/v100i18">Mulder et
 al. (2021, Section 4.4)</a></p>
-<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" tabindex="-1"></a>BF_glm <span class="ot">&lt;-</span> <span class="fu">BF</span>(fit_glm, <span class="at">hypothesis =</span> <span class="st">&quot;ztrust &gt; (zfWHR, zAfro) &gt; 0;</span></span>
-<span id="cb35-2"><a href="#cb35-2" tabindex="-1"></a><span class="st">             ztrust &gt; zfWHR = zAfro = 0&quot;</span>)</span>
-<span id="cb35-3"><a href="#cb35-3" tabindex="-1"></a><span class="fu">summary</span>(BF_glm)</span></code></pre></div>
+<div class="sourceCode" id="cb38"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" tabindex="-1"></a>BF_glm <span class="ot">&lt;-</span> <span class="fu">BF</span>(fit_glm, <span class="at">hypothesis =</span> <span class="st">&quot;ztrust &gt; (zfWHR, zAfro) &gt; 0;</span></span>
+<span id="cb38-2"><a href="#cb38-2" tabindex="-1"></a><span class="st">             ztrust &gt; zfWHR = zAfro = 0&quot;</span>)</span>
+<span id="cb38-3"><a href="#cb38-3" tabindex="-1"></a><span class="fu">summary</span>(BF_glm)</span></code></pre></div>
 <p>By calling the <code>summary</code> function on the output object of
 class <code>BF</code>, the results of the exploratory tests are
 presented of whether each separate parameter is zero, negative, or
@@ -929,20 +962,20 @@ al. (2021)</a></p>
 <div id="poisson-regression" class="section level4">
 <h4>Poisson regression</h4>
 <p>We illustrate this for a Poisson regression model</p>
-<div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a>poisson1 <span class="ot">&lt;-</span> <span class="fu">glm</span>(<span class="at">formula =</span> breaks <span class="sc">~</span> wool <span class="sc">+</span> tension, <span class="at">data =</span> datasets<span class="sc">::</span>warpbreaks,</span>
-<span id="cb36-2"><a href="#cb36-2" tabindex="-1"></a>             <span class="at">family =</span> poisson)</span></code></pre></div>
+<div class="sourceCode" id="cb39"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" tabindex="-1"></a>poisson1 <span class="ot">&lt;-</span> <span class="fu">glm</span>(<span class="at">formula =</span> breaks <span class="sc">~</span> wool <span class="sc">+</span> tension, <span class="at">data =</span> datasets<span class="sc">::</span>warpbreaks,</span>
+<span id="cb39-2"><a href="#cb39-2" tabindex="-1"></a>             <span class="at">family =</span> poisson)</span></code></pre></div>
 <p>The estimates, the error covariance matrix, and the sample size are
 extracted from the fitted model</p>
-<div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" tabindex="-1"></a>estimates <span class="ot">&lt;-</span> poisson1<span class="sc">$</span>coefficients</span>
-<span id="cb37-2"><a href="#cb37-2" tabindex="-1"></a>covmatrix <span class="ot">&lt;-</span> <span class="fu">vcov</span>(poisson1)</span>
-<span id="cb37-3"><a href="#cb37-3" tabindex="-1"></a>samplesize <span class="ot">&lt;-</span> <span class="fu">nobs</span>(poisson1)</span></code></pre></div>
+<div class="sourceCode" id="cb40"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" tabindex="-1"></a>estimates <span class="ot">&lt;-</span> poisson1<span class="sc">$</span>coefficients</span>
+<span id="cb40-2"><a href="#cb40-2" tabindex="-1"></a>covmatrix <span class="ot">&lt;-</span> <span class="fu">vcov</span>(poisson1)</span>
+<span id="cb40-3"><a href="#cb40-3" tabindex="-1"></a>samplesize <span class="ot">&lt;-</span> <span class="fu">nobs</span>(poisson1)</span></code></pre></div>
 <p>Constrained hypotheses on the parameters
 <code>names(estimates)</code> can then be tested as follows</p>
-<div class="sourceCode" id="cb38"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" tabindex="-1"></a>BF1 <span class="ot">&lt;-</span> <span class="fu">BF</span>(estimates, <span class="at">Sigma =</span> covmatrix, <span class="at">n =</span> samplesize, <span class="at">hypothesis =</span> </span>
-<span id="cb38-2"><a href="#cb38-2" tabindex="-1"></a>  <span class="st">&quot;woolB &gt; tensionM &gt; tensionH; woolB = tensionM = tensionH&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb41"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" tabindex="-1"></a>BF1 <span class="ot">&lt;-</span> <span class="fu">BF</span>(estimates, <span class="at">Sigma =</span> covmatrix, <span class="at">n =</span> samplesize, <span class="at">hypothesis =</span> </span>
+<span id="cb41-2"><a href="#cb41-2" tabindex="-1"></a>  <span class="st">&quot;woolB &gt; tensionM &gt; tensionH; woolB = tensionM = tensionH&quot;</span>)</span></code></pre></div>
 <p>Note that the same hypothesis test would be executed when calling</p>
-<div class="sourceCode" id="cb39"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" tabindex="-1"></a>BF2 <span class="ot">&lt;-</span> <span class="fu">BF</span>(poisson1, <span class="at">hypothesis =</span> <span class="st">&quot;woolB &gt; tensionM &gt; tensionH;</span></span>
-<span id="cb39-2"><a href="#cb39-2" tabindex="-1"></a><span class="st">          woolB = tensionM = tensionH&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb42"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" tabindex="-1"></a>BF2 <span class="ot">&lt;-</span> <span class="fu">BF</span>(poisson1, <span class="at">hypothesis =</span> <span class="st">&quot;woolB &gt; tensionM &gt; tensionH;</span></span>
+<span id="cb42-2"><a href="#cb42-2" tabindex="-1"></a><span class="st">          woolB = tensionM = tensionH&quot;</span>)</span></code></pre></div>
 <p>because the same Bayes factor is used when running <code>BF</code> on
 an object of class <code>glm</code> (see
 <code>Method: Bayes factor using Gaussian approximations</code> when
