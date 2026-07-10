@@ -12,7 +12,7 @@
 
 <meta name="author" content="Mulder, J., Williams, D. R., Gu, X., Tomarken, A., Boeing-Messing, F., Olsson-Collentine, A., Meijerink, M., Menke, J., van Aert, R., Fox, J.-P., Hoijtink, H., Rosseel, Y., Wagenmakers, E.-J., and van Lissa, C." />
 
-<meta name="date" content="2026-04-13" />
+<meta name="date" content="2026-07-10" />
 
 <title>Introduction to BFpack</title>
 
@@ -344,12 +344,34 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 Boeing-Messing, F., Olsson-Collentine, A., Meijerink, M., Menke, J., van
 Aert, R., Fox, J.-P., Hoijtink, H., Rosseel, Y., Wagenmakers, E.-J., and
 van Lissa, C.</h4>
-<h4 class="date">2026-04-13</h4>
+<h4 class="date">2026-07-10</h4>
 
 
+<div id="TOC">
+<ul>
+<li><a href="#introduction" id="toc-introduction"><span class="toc-section-number">1</span> Introduction</a></li>
+<li><a href="#reference" id="toc-reference"><span class="toc-section-number">2</span> Reference</a></li>
+<li><a href="#usage" id="toc-usage"><span class="toc-section-number">3</span> Usage</a></li>
+<li><a href="#arguments" id="toc-arguments"><span class="toc-section-number">4</span> Arguments</a></li>
+<li><a href="#output" id="toc-output"><span class="toc-section-number">5</span> Output</a></li>
+<li><a href="#example-analyses" id="toc-example-analyses"><span class="toc-section-number">6</span> Example analyses</a>
+<ul>
+<li><a href="#normal-linear-models-t-testing-linear-regression-mancova" id="toc-normal-linear-models-t-testing-linear-regression-mancova"><span class="toc-section-number">6.1</span> Normal linear models (t-testing,
+linear regression, (M)AN(C)OVA)</a></li>
+<li><a href="#testing-independent-group-variances" id="toc-testing-independent-group-variances"><span class="toc-section-number">6.2</span> Testing independent group
+variances</a></li>
+<li><a href="#testing-correlations" id="toc-testing-correlations"><span class="toc-section-number">6.3</span> Testing correlations</a></li>
+<li><a href="#meta-analyses" id="toc-meta-analyses"><span class="toc-section-number">6.4</span> Meta-analyses</a></li>
+<li><a href="#exponential-random-graph-models" id="toc-exponential-random-graph-models"><span class="toc-section-number">6.5</span> Exponential random graph
+models</a></li>
+<li><a href="#hypothesis-testing-using-normal-approximations" id="toc-hypothesis-testing-using-normal-approximations"><span class="toc-section-number">6.6</span> Hypothesis testing using normal
+approximations</a></li>
+</ul></li>
+</ul>
+</div>
 
-<div id="introduction" class="section level2">
-<h2>Introduction</h2>
+<div id="introduction" class="section level2" number="1">
+<h2><span class="header-section-number">1</span> Introduction</h2>
 <p><code>BFpack</code> contains a collection of functions for Bayesian
 hypothesis testing using Bayes factors and posterior probabilities in R.
 The main function <code>BF</code> needs a fitted model <code>x</code> as
@@ -373,8 +395,8 @@ with the error covariance matrix in the argument <code>Sigma</code>, and
 the sample size used to obtain the estimates, to perform an approximate
 Bayes factor test using large sample theory.</p>
 </div>
-<div id="reference" class="section level2">
-<h2>Reference</h2>
+<div id="reference" class="section level2" number="2">
+<h2><span class="header-section-number">2</span> Reference</h2>
 <p>The key references for the package are</p>
 <p>Mulder, J., Williams, D. R., Gu, X., Tomarken, A., Boeing-Messing,
 F., Olsson-Collentine, A., Meijerink, M., Menke, J., van Aert, R., Fox,
@@ -386,12 +408,12 @@ Boeing-Messing, F., Williams, D. R., Fox, J.-P., Menke, J., et
 al. (2021). BFpack: Flexible Bayes Factor Testing of Scientific
 Expectations. (Version 0.3.2) <a href="https://CRAN.R-project.org/package=BFpack" class="uri">https://CRAN.R-project.org/package=BFpack</a></p>
 </div>
-<div id="usage" class="section level2">
-<h2>Usage</h2>
-<p><code>BF(x, hypothesis, prior.hyp = NULL, complement = TRUE, ...)</code></p>
+<div id="usage" class="section level2" number="3">
+<h2><span class="header-section-number">3</span> Usage</h2>
+<p><code>BF(x, hypothesis, prior.hyp.explo = NULL, prior.hyp.conf = NULL, complement = TRUE, ...)</code></p>
 </div>
-<div id="arguments" class="section level2">
-<h2>Arguments</h2>
+<div id="arguments" class="section level2" number="4">
+<h2><span class="header-section-number">4</span> Arguments</h2>
 <ul>
 <li><code>x</code>, a fitted model object that is obtained using a
 R-function. The object can be obtained via the following R functions:
@@ -401,7 +423,7 @@ R-function. The object can be obtained via the following R functions:
 variances,</li>
 <li><code>aov</code> for AN(C)OVA testing,</li>
 <li><code>manova</code> for MAN(C)OVA testing,</li>
-<li><code>lm</code> for linear regresssion analysis,</li>
+<li><code>lm</code> for linear regression analysis,</li>
 <li><code>cor_test</code> for correlation analysis,</li>
 <li><code>lmer</code> currently for testing intraclass correlations in
 random intercept models,</li>
@@ -475,19 +497,19 @@ argument.</li>
 estimates and covariance matrix.</li>
 </ul>
 </div>
-<div id="output" class="section level2">
-<h2>Output</h2>
+<div id="output" class="section level2" number="5">
+<h2><span class="header-section-number">5</span> Output</h2>
 <p>The output is of class <code>BF</code>. By running the
 <code>print</code> function on the <code>BF</code> object, a short
 overview of the results are presented. By running the
 <code>summary</code> function on the <code>BF</code> object, a
 comprehensive overview of the results are presented.</p>
 </div>
-<div id="example-analyses" class="section level2">
-<h2>Example analyses</h2>
-<div id="normal-linear-models-t-testing-linear-regression-mancova" class="section level3">
-<h3>Normal linear models (t-testing, linear regression,
-(M)AN(C)OVA)</h3>
+<div id="example-analyses" class="section level2" number="6">
+<h2><span class="header-section-number">6</span> Example analyses</h2>
+<div id="normal-linear-models-t-testing-linear-regression-mancova" class="section level3" number="6.1">
+<h3><span class="header-section-number">6.1</span> Normal linear models
+(t-testing, linear regression, (M)AN(C)OVA)</h3>
 <p>For an object of class <code>t_test</code> (t testing),
 <code>lm</code> (linear regression), <code>lml</code> (multivariate
 linear regression), <code>aov</code> (AN(C)OVA), <code>manova</code>
@@ -525,8 +547,9 @@ testing hypotheses with only one-sided or order constraints. The general
 methodology for the multivariate linear model is discussed in <a href="https://www.jstatsoft.org/article/view/v100i18">Mulder et
 al. (2021)</a> and <a href="https://doi.org/10.1080/00273171.2021.1904809">Mulder and Gu
 (2021)</a>.</p>
-<div id="univariate-t-testing" class="section level4">
-<h4>Univariate t testing</h4>
+<div id="univariate-t-testing" class="section level4" number="6.1.1">
+<h4><span class="header-section-number">6.1.1</span> Univariate t
+testing</h4>
 <p>First a classical one sample t test is executed for the test value
 <span class="math inline">\(\mu = 5\)</span> on the therapeutic data</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>ttest1 <span class="ot">&lt;-</span> bain<span class="sc">::</span><span class="fu">t_test</span>(therapeutic, <span class="at">alternative =</span> <span class="st">&quot;greater&quot;</span>, <span class="at">mu =</span> <span class="dv">5</span>)</span></code></pre></div>
@@ -555,7 +578,7 @@ explicitly specified using the <code>hypothesis</code> argument.</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>hypothesis <span class="ot">&lt;-</span> <span class="st">&quot;mu = 5; mu &lt; 5; mu &gt; 5&quot;</span></span>
 <span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">BF</span>(ttest1, <span class="at">hypothesis =</span> hypothesis)</span></code></pre></div>
 <p>In the above test the complement hypothesis is excluded automatically
-as the formualted hypothesis under the <code>hypothesis</code> argument
+as the formulated hypothesis under the <code>hypothesis</code> argument
 cover the complete parameter space. Furthermore, when testing hypotheses
 via the <code>hypothesis</code> argument, the output also presents an
 <code>Evidence matrix</code> containing the Bayes factors between the
@@ -567,22 +590,23 @@ default) corresponds to the hypothesis that assumes that the population
 mean is anything but the null value</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>hypothesis <span class="ot">&lt;-</span> <span class="st">&quot;mu = 5&quot;</span></span>
 <span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">BF</span>(ttest1, <span class="at">hypothesis =</span> hypothesis)</span></code></pre></div>
-<p>The argument <code>prior.hyp</code> can be used to specify different
-prior probabilities for the hypotheses. For example, when the left
-one-tailed hypothesis is not possible based on prior considerations
-(e.g., see <a href="https://www.jstatsoft.org/article/view/v100i18">Mulder et
+<p>The argument <code>prior.hyp.conf</code> can be used to specify
+different prior probabilities for the hypotheses formulated under the
+<code>hypothesis</code> argument. For example, when the left one-tailed
+hypothesis is not possible based on prior considerations (e.g., see <a href="https://www.jstatsoft.org/article/view/v100i18">Mulder et
 al. (2021, Section 4.1)</a>) while the precise (null) hypothesis and the
 right one-tailed hypothesis are equally likely, the argument
-<code>prior.hyp</code> should be a vector specifying the prior
+<code>prior.hyp.conf</code> should be a vector specifying the prior
 probabilities of the respective hypotheses</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">BF</span>(ttest1, <span class="at">hypothesis =</span> <span class="st">&quot;mu = 5; mu &lt; 5; mu &gt; 5&quot;</span>, <span class="at">prior.hyp =</span> <span class="fu">c</span>(.<span class="dv">5</span>,<span class="dv">0</span>,.<span class="dv">5</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">BF</span>(ttest1, <span class="at">hypothesis =</span> <span class="st">&quot;mu = 5; mu &lt; 5; mu &gt; 5&quot;</span>, <span class="at">prior.hyp.conf =</span> <span class="fu">c</span>(.<span class="dv">5</span>,<span class="dv">0</span>,.<span class="dv">5</span>))</span></code></pre></div>
 <p>For more information about the methodology, we refer the interested
 reader to <a href="https://www.jstatsoft.org/article/view/v100i18">Mulder et
 al. (2021)</a> and <a href="https://doi.org/10.1080/00273171.2021.1904809">Mulder and Gu
 (2021)</a>.</p>
 </div>
-<div id="multivariate-t-testing" class="section level4">
-<h4>Multivariate t testing</h4>
+<div id="multivariate-t-testing" class="section level4" number="6.1.2">
+<h4><span class="header-section-number">6.1.2</span> Multivariate t
+testing</h4>
 <p>Bayesian multivariate t tests can be executed by first fitting a
 multivariate (regression) model using the <code>lm</code> function, and
 subsequently, the means of the dependent variables (or other
@@ -604,8 +628,9 @@ none of these two hypotheses (<code>complement</code>):</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>BFmlm1 <span class="ot">&lt;-</span> <span class="fu">BF</span>(mlm1, <span class="at">hypothesis=</span><span class="st">&quot;ones_on_Superficial=ones_on_Middle=ones_on_Deep=0;</span></span>
 <span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="st">                               (ones_on_Superficial,ones_on_Middle,ones_on_Deep)&gt;0&quot;</span>)</span></code></pre></div>
 </div>
-<div id="analysis-of-variance" class="section level4">
-<h4>Analysis of variance</h4>
+<div id="analysis-of-variance" class="section level4" number="6.1.3">
+<h4><span class="header-section-number">6.1.3</span> Analysis of
+variance</h4>
 <p>First an analysis of variance (ANOVA) model is fitted using the
 <code>aov</code> fuction in <code>R</code>.</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>aov1 <span class="ot">&lt;-</span> <span class="fu">aov</span>(price <span class="sc">~</span> anchor <span class="sc">*</span> motivation, <span class="at">data =</span> tvprices)</span></code></pre></div>
@@ -628,10 +653,11 @@ hypotheses hold). This test can be executed as follows:</p>
 <span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">1234</span>)</span>
 <span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="fu">BF</span>(aov1, <span class="at">hypothesis =</span> constraints2)</span></code></pre></div>
 </div>
-<div id="univariate-and-multivariate-multiple-regression" class="section level4">
-<h4>Univariate and multivariate multiple regression</h4>
+<div id="univariate-and-multivariate-multiple-regression" class="section level4" number="6.1.4">
+<h4><span class="header-section-number">6.1.4</span> Univariate and
+multivariate multiple regression</h4>
 <p>For a univariate regression model, by default an exhaustive test is
-executed of whether an effect is zero, negative, or postive.</p>
+executed of whether an effect is zero, negative, or positive.</p>
 <div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>lm1 <span class="ot">&lt;-</span> <span class="fu">lm</span>(Superficial <span class="sc">~</span> Face <span class="sc">+</span> Vehicle, <span class="at">data =</span> fmri)</span>
 <span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>BF1 <span class="ot">&lt;-</span> <span class="fu">BF</span>(lm1)</span>
 <span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="fu">print</span>(BF1)</span></code></pre></div>
@@ -663,8 +689,9 @@ and Olsson-Collentine (2019)</a> and <a href="https://doi.org/10.1080/00273171.2
 (2021)</a></p>
 </div>
 </div>
-<div id="testing-independent-group-variances" class="section level3">
-<h3>Testing independent group variances</h3>
+<div id="testing-independent-group-variances" class="section level3" number="6.2">
+<h3><span class="header-section-number">6.2</span> Testing independent
+group variances</h3>
 <p>First a classical significance test is executed using the
 <code>bartlett_test</code> function, which is part of the
 <strong><em>BFpack</em></strong> package. The function is equivalent to
@@ -719,11 +746,12 @@ are as heterogeneous in their attentional performances as the healthy
 control population in this specific task, but further research would be
 required to obtain more conclusive evidence.</p>
 <p>For more information about the methodology, we refer the interested
-reader to <a href="https://www.researchgate.net/publication/317418250_Bayesian_evaluation_of_constrained_hypotheses_on_variances_of_multiple_independent_groups">Boing-Messing
+reader to <a href="https://www.researchgate.net/publication/317418250_Bayesian_evaluation_of_constrained_hypotheses_on_variances_of_multiple_independent_groups">Boeing-Messing
 et al. (2017)</a></p>
 </div>
-<div id="testing-correlations" class="section level3">
-<h3>Testing correlations</h3>
+<div id="testing-correlations" class="section level3" number="6.3">
+<h3><span class="header-section-number">6.3</span> Testing
+correlations</h3>
 <p><code>BFpack</code> can be used for testing overlapping,
 nonoverlapping, and independent correlations, between variables of
 different measurement levels (continuous, dichotomous, ordinal),
@@ -777,8 +805,8 @@ reader to <a href="https://www.researchgate.net/publication/280256902_Bayes_fact
 (2016)</a> and <a href="https://doi.org/10.1080/02664763.2021.1992360">Mulder and Gelissen
 (2019)</a></p>
 </div>
-<div id="meta-analyses" class="section level3">
-<h3>Meta-analyses</h3>
+<div id="meta-analyses" class="section level3" number="6.4">
+<h3><span class="header-section-number">6.4</span> Meta-analyses</h3>
 <p><code>BFpack</code> supports testing the mean effect in a fixed
 effects meta-analysis model, a random effects model, and a (hybrid)
 marginalized random effects meta-analysis (marema) model. Depending on
@@ -857,8 +885,9 @@ reader to <a href="https://link.springer.com/article/10.3758/s13423-021-01918-9"
 Aert and Mulder (2021)</a> and <a href="https://doi.org/10.1017/rsm.2025.10060">Mulder and van Aert
 (2025)</a>.</p>
 </div>
-<div id="exponential-random-graph-models" class="section level3">
-<h3>Exponential random graph models</h3>
+<div id="exponential-random-graph-models" class="section level3" number="6.5">
+<h3><span class="header-section-number">6.5</span> Exponential random
+graph models</h3>
 <p><code>BFpack</code> can be used for Bayes factor testing of the
 coefficients in an exponential random graph model (ERGM). As input the
 <code>BF()</code> function requires a fitted ERGM either from the
@@ -895,11 +924,20 @@ prior from the <code>BF</code> object:</p>
 reader to <a href="https://doi.org/10.1016/j.socnet.2023.11.004">Mulder,
 Friel, and Leifeld (2024)</a>.</p>
 </div>
-<div id="hypothesis-testing-using-normal-approximations" class="section level3">
-<h3>Hypothesis testing using normal approximations</h3>
-</div>
-<div id="running-bf-on-a-named-vector" class="section level3">
-<h3>Running <code>BF</code> on a named vector</h3>
+<div id="hypothesis-testing-using-normal-approximations" class="section level3" number="6.6">
+<h3><span class="header-section-number">6.6</span> Hypothesis testing
+using normal approximations</h3>
+<p>For several model classes, Bayes factors are computed using Gaussian
+(large-sample) approximations of the likelihood and posterior, in the
+spirit of the classical Wald test. This applies by default to fitted
+objects of class <code>glm</code>, <code>coxph</code>,
+<code>survreg</code>, <code>polr</code>, and <code>zeroinfl</code>, and
+can also be used directly by supplying a named vector of estimates
+together with their error covariance matrix and sample size (illustrated
+below).</p>
+<div id="running-bf-on-a-named-vector" class="section level4" number="6.6.1">
+<h4><span class="header-section-number">6.6.1</span> Running
+<code>BF</code> on a named vector</h4>
 <p>The input for the <code>BF</code> function can also be a named vector
 containing the estimates of the parameters of interest. In this case the
 error covariance matrix of the estimates is also needed via the
@@ -922,8 +960,10 @@ function can be used for testing coefficients in a poisson regression
 model and as well an equivalent analysis when <code>x</code> is a named
 vector using the MLEs, error covariance matrix <code>Sigma</code>, and
 sample size <code>n</code>.</p>
-<div id="logistic-regression" class="section level4">
-<h4>Logistic regression</h4>
+</div>
+<div id="logistic-regression" class="section level4" number="6.6.2">
+<h4><span class="header-section-number">6.6.2</span> Logistic
+regression</h4>
 <p>An example hypothesis test is considered under a logistic regression
 model. First a logistic regression model is fitted using the
 <code>glm</code> function</p>
@@ -933,7 +973,7 @@ model. First a logistic regression model is fitted using the
 separate regression coefficients are zero, negative, or positive:</p>
 <div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a><span class="fu">BF</span>(fit_glm)</span></code></pre></div>
 <p>The names of the regression coefficients on which constrained
-hypotheses can be formualted can be extracted using the
+hypotheses can be formulated can be extracted using the
 <code>get_estimates</code> function.</p>
 <div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" tabindex="-1"></a><span class="fu">get_estimates</span>(fit_glm)</span></code></pre></div>
 <p>Two different hypotheses are formulated with competing equality
@@ -959,8 +999,9 @@ reader to <a href="https://bpspsychub.onlinelibrary.wiley.com/doi/full/10.1111/b
 et al. (2018)</a> and <a href="https://www.jstatsoft.org/article/view/v100i18">Mulder et
 al. (2021)</a></p>
 </div>
-<div id="poisson-regression" class="section level4">
-<h4>Poisson regression</h4>
+<div id="poisson-regression" class="section level4" number="6.6.3">
+<h4><span class="header-section-number">6.6.3</span> Poisson
+regression</h4>
 <p>We illustrate this for a Poisson regression model</p>
 <div class="sourceCode" id="cb39"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" tabindex="-1"></a>poisson1 <span class="ot">&lt;-</span> <span class="fu">glm</span>(<span class="at">formula =</span> breaks <span class="sc">~</span> wool <span class="sc">+</span> tension, <span class="at">data =</span> datasets<span class="sc">::</span>warpbreaks,</span>
 <span id="cb39-2"><a href="#cb39-2" tabindex="-1"></a>             <span class="at">family =</span> poisson)</span></code></pre></div>

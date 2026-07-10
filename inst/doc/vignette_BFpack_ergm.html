@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Joris Mulder" />
+
+<meta name="date" content="2026-07-10" />
+
+<title>Testing Scientific Expectations under ERGMs with BFpack</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Testing Scientific Expectations under ERGMs
+with BFpack</h1>
+<h4 class="author">Joris Mulder</h4>
+<h4 class="date">2026-07-10</h4>
+
+
+<div id="TOC">
+<ul>
+<li><a href="#introduction-and-learning-objectives" id="toc-introduction-and-learning-objectives"><span class="toc-section-number">1</span> Introduction and learning
+objectives</a>
+<ul>
+<li><a href="#why-go-beyond-the-p-value" id="toc-why-go-beyond-the-p-value"><span class="toc-section-number">1.1</span> Why go beyond the
+<em>p</em>-value?</a></li>
+<li><a href="#what-you-will-be-able-to-do-after-this-session" id="toc-what-you-will-be-able-to-do-after-this-session"><span class="toc-section-number">1.2</span> What you will be able to do after
+this session</a></li>
+</ul></li>
+<li><a href="#setup-packages-seed-and-data" id="toc-setup-packages-seed-and-data"><span class="toc-section-number">2</span> Setup: packages, seed, and data</a>
+<ul>
+<li><a href="#the-chemnet-policy-network" id="toc-the-chemnet-policy-network"><span class="toc-section-number">2.0.1</span> The <code>chemnet</code> policy
+network</a></li>
+</ul></li>
+<li><a href="#preparing-the-network-data" id="toc-preparing-the-network-data"><span class="toc-section-number">3</span> Preparing the network data</a>
+<ul>
+<li><a href="#build-the-network-objects" id="toc-build-the-network-objects"><span class="toc-section-number">3.0.1</span> Build the network
+objects</a></li>
+</ul></li>
+<li><a href="#a-simplified-ergm-to-learn-the-workflow" id="toc-a-simplified-ergm-to-learn-the-workflow"><span class="toc-section-number">4</span> A simplified ERGM to learn the
+workflow</a>
+<ul>
+<li><a href="#step-1-fit-the-model" id="toc-step-1-fit-the-model"><span class="toc-section-number">4.1</span> Step 1 — Fit the model</a></li>
+<li><a href="#step-2-read-the-exact-parameter-names" id="toc-step-2-read-the-exact-parameter-names"><span class="toc-section-number">4.2</span> Step 2 — Read the exact parameter
+names</a></li>
+<li><a href="#step-3-4-test-a-precise-null-does-preference-similarity-matter" id="toc-step-3-4-test-a-precise-null-does-preference-similarity-matter"><span class="toc-section-number">4.3</span> Step 3 &amp; 4 — Test a precise
+null: does preference similarity matter?</a></li>
+</ul></li>
+<li><a href="#testing-competing-constrained-hypotheses" id="toc-testing-competing-constrained-hypotheses"><span class="toc-section-number">5</span> Testing competing constrained
+hypotheses</a>
+<ul>
+<li><a href="#reading-the-specification-table" id="toc-reading-the-specification-table"><span class="toc-section-number">5.0.1</span> Reading the specification
+table</a></li>
+<li><a href="#changing-the-prior-probabilities-of-hypotheses" id="toc-changing-the-prior-probabilities-of-hypotheses"><span class="toc-section-number">5.0.2</span> Changing the prior probabilities
+of hypotheses</a></li>
+</ul></li>
+<li><a href="#the-full-model-reproducing-the-paper" id="toc-the-full-model-reproducing-the-paper"><span class="toc-section-number">6</span> The full model, reproducing the
+paper</a>
+<ul>
+<li><a href="#published-results" id="toc-published-results"><span class="toc-section-number">6.1</span> Published results</a>
+<ul>
+<li><a href="#test-1-no-effect-of-preference-similarity" id="toc-test-1-no-effect-of-preference-similarity"><span class="toc-section-number">6.1.1</span> Test 1 — no effect of preference
+similarity</a></li>
+<li><a href="#test-2-the-ranking-of-opportunity-structure-effects" id="toc-test-2-the-ranking-of-opportunity-structure-effects"><span class="toc-section-number">6.1.2</span> Test 2 — the ranking of
+opportunity-structure effects</a></li>
+</ul></li>
+</ul></li>
+<li><a href="#reporting-and-interpretation-checklist" id="toc-reporting-and-interpretation-checklist"><span class="toc-section-number">7</span> Reporting and interpretation
+checklist</a></li>
+<li><a href="#references" id="toc-references"><span class="toc-section-number">8</span> References</a></li>
+</ul>
+</div>
+
+<blockquote>
+<p><strong>How to use this document.</strong> Every code block below is
+ready to paste into an R session and run in order. To keep the handout
+light, the chunks are <em>not</em> executed while knitting
+(<code>eval = FALSE</code> in the setup chunk); instead, the expected
+results are shown and discussed in the text and tables. To run the
+analysis live, either change <code>eval = FALSE</code> to
+<code>eval = TRUE</code> in the setup chunk, or simply copy each block
+into R. Fitting the Bayesian ERGMs with <code>bergm</code> takes a few
+minutes per model.</p>
+</blockquote>
+<p><em>This vignette is based on Mulder, J., Friel, N., &amp; Leifeld,
+P. (2024), “Bayesian testing of scientific expectations under
+exponential random graph models,” Social Networks, 78, 40–53 (<a href="https://doi.org/10.1016/j.socnet.2023.11.004" class="uri">https://doi.org/10.1016/j.socnet.2023.11.004</a>). It adapts
+the analyses and results reported in ‘Application A’ into a hands-on
+tutorial for the <code>BFpack</code> package.</em></p>
+<hr />
+<div id="introduction-and-learning-objectives" class="section level1" number="1">
+<h1><span class="header-section-number">1</span> Introduction and
+learning objectives</h1>
+<p>Exponential random graph models (ERGMs) are the workhorse for
+explaining how ties form in social and political networks. The standard
+workflow fits an ERGM by maximum likelihood and then reads off <span class="math inline">\(p\)</span>-values to decide which predictors
+“matter”. This tutorial teaches a complementary, and in several respects
+more informative, approach: <strong>Bayesian hypothesis testing with
+Bayes factors and posterior probabilities</strong>, as implemented in
+the R package <strong><code>BFpack</code></strong>.</p>
+<p>The methodology, and the running example we use here, come from:</p>
+<blockquote>
+<p>Mulder, J., Friel, N., &amp; Leifeld, P. (2024). <em>Bayesian testing
+of scientific expectations under exponential random graph models.</em>
+<strong>Social Networks, 78</strong>, 40–53. <a href="https://doi.org/10.1016/j.socnet.2023.11.004" class="uri">https://doi.org/10.1016/j.socnet.2023.11.004</a></p>
+</blockquote>
+<p>The empirical case is the German toxic-chemicals policy network of
+Leifeld &amp; Schneider (2012), distributed as the <code>chemnet</code>
+data in the <strong><code>btergm</code></strong> package.</p>
+<div id="why-go-beyond-the-p-value" class="section level2" number="1.1">
+<h2><span class="header-section-number">1.1</span> Why go beyond the
+<em>p</em>-value?</h2>
+<p>The paper motivates the Bayesian approach through three concrete
+limitations of significance testing that bite hard in network
+research:</p>
+<ol style="list-style-type: decimal">
+<li><p><strong>A <em>p</em>-value cannot support a null.</strong> It can
+only <em>falsify</em> a hypothesis. If preference similarity is
+non-significant after controlling for opportunity structures, we cannot
+tell whether that is <em>evidence of absence</em> (the effect really is
+~0) or merely <em>absence of evidence</em> (the study is underpowered).
+Leifeld &amp; Schneider (2012) ran into exactly this: they wanted to
+argue that preference similarity had <em>no</em> additional effect, but
+a non-significant <em>p</em>-value cannot license that claim.</p></li>
+<li><p><strong>The <em>p</em>-value is inconsistent under the
+null.</strong> Because it is uniform under the null, there is always a
+fixed probability (typically .05) of rejecting a true null — even as the
+network grows arbitrarily large. A Bayes factor, by contrast, is
+<em>consistent</em>: evidence for the true hypothesis grows without
+bound as the network grows.</p></li>
+<li><p><strong>The <em>p</em>-value cannot directly test competing
+constrained hypotheses.</strong> Scientific expectations are often
+phrased with order constraints — “effect A is larger than effect B,
+which is larger than effect C”. Testing <span class="math inline">\(\beta_{\text{committee}} &gt;
+\beta_{\text{influence}} &gt; \beta_{\text{pref.sim}} &gt; 0\)</span>
+against equality or against “none of the above” is natural for a Bayes
+factor, but awkward or impossible with <em>p</em>-values.</p></li>
+</ol>
+<p>Bayes factors address all three: they quantify evidence
+<strong>for</strong> a null, they are <strong>consistent</strong>, and
+they test <strong>equality and/or order constraints</strong> on ERGM
+coefficients directly.</p>
+</div>
+<div id="what-you-will-be-able-to-do-after-this-session" class="section level2" number="1.2">
+<h2><span class="header-section-number">1.2</span> What you will be able
+to do after this session</h2>
+<p>By the end you will be able to:</p>
+<ul>
+<li>fit an ERGM with <code>ergm</code> and inspect the exact coefficient
+names with <code>get_estimates()</code>;</li>
+<li>translate a substantive expectation into a <code>BFpack</code>
+hypothesis string using equality (<code>=</code>) and order
+(<code>&gt;</code>, <code>&lt;</code>) constraints;</li>
+<li>compute Bayes factors and posterior probabilities with
+<code>BF()</code> for
+<ol style="list-style-type: lower-roman">
+<li>a precise null hypothesis and (ii) a set of competing constrained
+hypotheses;</li>
+</ol></li>
+<li>read the <strong>specification table</strong> to understand how a
+Bayes factor balances <em>fit</em> against <em>complexity</em> (an
+Occam’s razor); and</li>
+<li>report and interpret the results the way the paper does.</li>
+</ul>
+<hr />
+</div>
+</div>
+<div id="setup-packages-seed-and-data" class="section level1" number="2">
+<h1><span class="header-section-number">2</span> Setup: packages, seed,
+and data</h1>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># Install once, if needed:</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="co"># install.packages(c(&quot;statnet&quot;, &quot;ergm&quot;, &quot;BFpack&quot;, &quot;btergm&quot;, &quot;sna&quot;, &quot;Bergm&quot;))</span></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;statnet&quot;</span>)   <span class="co"># umbrella package: loads network, sna, ergm, ...</span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;ergm&quot;</span>)      <span class="co"># fitting ERGMs by MLE</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;BFpack&quot;</span>)    <span class="co"># Bayes factors for constrained hypotheses (v1.2.3+)</span></span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;btergm&quot;</span>)    <span class="co"># ships the chemnet policy-network data</span></span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;sna&quot;</span>)       <span class="co"># network descriptives (e.g. betweenness)</span></span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>seed <span class="ot">&lt;-</span> <span class="dv">1234</span></span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="fu">set.seed</span>(seed)</span></code></pre></div>
+<p>We use a fixed <code>seed</code> throughout. Two sources of
+randomness matter here: the MLE search inside <code>ergm</code>, and —
+more importantly — the MCMC sampler inside the Bayesian ERGM fit that
+<code>BFpack</code> runs under the hood. Fixing the seed makes the
+workshop reproducible, but note that Bayes-factor values will still
+wobble a little from run to run; the <em>substantive</em> conclusions
+are stable.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">data</span>(<span class="st">&quot;chemnet&quot;</span>)   <span class="co"># ?chemnet for documentation (Leifeld &amp; Schneider 2012, AJPS)</span></span></code></pre></div>
+<div id="the-chemnet-policy-network" class="section level3" number="2.0.1">
+<h3><span class="header-section-number">2.0.1</span> The
+<code>chemnet</code> policy network</h3>
+<p><code>chemnet</code> concerns political information exchange among 30
+organizations (interest groups, government agencies, scientific bodies,
+…) involved in German toxic-chemicals policy. Loading it makes several
+objects available:</p>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Object</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>pol</code></td>
+<td>political/strategic information exchange (the
+<strong>outcome</strong> network)</td>
+</tr>
+<tr class="even">
+<td><code>scito</code>, <code>scifrom</code></td>
+<td>reported sending / receiving of scientific information</td>
+</tr>
+<tr class="odd">
+<td><code>intpos</code></td>
+<td>matrix of actors’ positions on policy issues (preferences)</td>
+</tr>
+<tr class="even">
+<td><code>committee</code></td>
+<td>actor-by-committee membership matrix</td>
+</tr>
+<tr class="odd">
+<td><code>infrep</code></td>
+<td>influence attribution (who is named as influential)</td>
+</tr>
+<tr class="even">
+<td><code>types</code></td>
+<td>organization type for each actor</td>
+</tr>
+</tbody>
+</table>
+<p>Our analysis explains the <strong>political information network
+<code>pol</code></strong> using covariates built from the other objects,
+following the paper.</p>
+<hr />
+</div>
+</div>
+<div id="preparing-the-network-data" class="section level1" number="3">
+<h1><span class="header-section-number">3</span> Preparing the network
+data</h1>
+<p>The covariates below reproduce Equations (1)–(4) of the paper. Each
+transforms raw data into a dyadic predictor that can enter the ERGM
+through <code>edgecov()</code>.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># (1) Confirmed scientific-information tie: i-&gt;j only if i claims sending</span></span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="co">#     AND j claims receiving. Element-wise product of scito and t(scifrom).</span></span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>sci <span class="ot">&lt;-</span> scito <span class="sc">*</span> <span class="fu">t</span>(scifrom)                 <span class="co"># Eq. (1)</span></span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co"># (2)-(3) Preference similarity from issue positions: Euclidean distance,</span></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co">#     then reversed so that LARGER = MORE similar.</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>prefsim <span class="ot">&lt;-</span> <span class="fu">dist</span>(intpos, <span class="at">method =</span> <span class="st">&quot;euclidean&quot;</span>)   <span class="co"># Eq. (2)</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>prefsim <span class="ot">&lt;-</span> <span class="fu">max</span>(prefsim) <span class="sc">-</span> prefsim               <span class="co"># Eq. (3): distance -&gt; similarity</span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>prefsim <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(prefsim)</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="co"># Standardize preference similarity (needed for the ORDER test, so that</span></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="co"># effect sizes are comparable on a common scale). We standardize the</span></span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="co"># off-diagonal entries jointly and write them back.</span></span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>prefsim_scaled <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">scale</span>(<span class="fu">c</span>(prefsim[<span class="fu">lower.tri</span>(prefsim)],</span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a>                            prefsim[<span class="fu">upper.tri</span>(prefsim)])))</span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a>prefsim_st <span class="ot">&lt;-</span> prefsim</span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a>prefsim_st[<span class="fu">lower.tri</span>(prefsim_st)] <span class="ot">&lt;-</span> prefsim_scaled[<span class="dv">1</span><span class="sc">:</span>(<span class="fu">length</span>(prefsim_scaled)<span class="sc">/</span><span class="dv">2</span>)]</span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a>prefsim_st[<span class="fu">upper.tri</span>(prefsim_st)] <span class="ot">&lt;-</span> prefsim_scaled[(<span class="fu">length</span>(prefsim_scaled)<span class="sc">/</span><span class="dv">2</span> <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span><span class="fu">length</span>(prefsim_scaled)]</span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a></span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a><span class="co"># (4) Shared committee memberships: co-membership count, diagonal set to 0.</span></span>
+<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a>committee <span class="ot">&lt;-</span> committee <span class="sc">%*%</span> <span class="fu">t</span>(committee)   <span class="co"># Eq. (4)</span></span>
+<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a><span class="fu">diag</span>(committee) <span class="ot">&lt;-</span> <span class="dv">0</span>                       <span class="co"># self-membership is meaningless</span></span>
+<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a>committee_scaled <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">scale</span>(<span class="fu">c</span>(committee[<span class="fu">lower.tri</span>(committee)],</span>
+<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a>                              committee[<span class="fu">upper.tri</span>(committee)])))</span>
+<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a>committee_st <span class="ot">&lt;-</span> committee</span>
+<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a>committee_st[<span class="fu">lower.tri</span>(committee_st)] <span class="ot">&lt;-</span> committee_scaled[<span class="dv">1</span><span class="sc">:</span>(<span class="fu">length</span>(committee_scaled)<span class="sc">/</span><span class="dv">2</span>)]</span>
+<span id="cb3-27"><a href="#cb3-27" tabindex="-1"></a>committee_st[<span class="fu">upper.tri</span>(committee_st)] <span class="ot">&lt;-</span> committee_scaled[(<span class="fu">length</span>(committee_scaled)<span class="sc">/</span><span class="dv">2</span> <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span><span class="fu">length</span>(committee_scaled)]</span>
+<span id="cb3-28"><a href="#cb3-28" tabindex="-1"></a></span>
+<span id="cb3-29"><a href="#cb3-29" tabindex="-1"></a><span class="co"># Organization type as a vertex attribute (vector form).</span></span>
+<span id="cb3-30"><a href="#cb3-30" tabindex="-1"></a>types <span class="ot">&lt;-</span> types[, <span class="dv">1</span>]</span>
+<span id="cb3-31"><a href="#cb3-31" tabindex="-1"></a></span>
+<span id="cb3-32"><a href="#cb3-32" tabindex="-1"></a><span class="co"># Influence attribution, standardized.</span></span>
+<span id="cb3-33"><a href="#cb3-33" tabindex="-1"></a>infrep_st <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">c</span>(<span class="fu">scale</span>(<span class="fu">c</span>(infrep))), <span class="at">nrow =</span> <span class="fu">nrow</span>(infrep))</span></code></pre></div>
+<blockquote>
+<p><strong>Why standardize?</strong> For a test that only asks “is this
+effect zero?” the scale of a covariate is irrelevant. But for an
+<strong>order-constrained</strong> test such as
+<code>committee &gt; influence &gt; pref.sim</code>, the coefficients
+are only comparable if the predictors share a common scale.
+Standardizing the three edge covariates puts them on the same footing,
+so the ordering of coefficients is an ordering of <em>effect
+sizes</em>.</p>
+</blockquote>
+<div id="build-the-network-objects" class="section level3" number="3.0.1">
+<h3><span class="header-section-number">3.0.1</span> Build the network
+objects</h3>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># Outcome: political / strategic information exchange</span></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>nw.pol <span class="ot">&lt;-</span> <span class="fu">network</span>(pol)</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="fu">set.vertex.attribute</span>(nw.pol, <span class="st">&quot;orgtype&quot;</span>, types)</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="fu">set.vertex.attribute</span>(nw.pol, <span class="st">&quot;betweenness&quot;</span>, <span class="fu">betweenness</span>(nw.pol))</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="co"># Covariate network: confirmed technical / scientific information exchange</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>nw.sci <span class="ot">&lt;-</span> <span class="fu">network</span>(sci)</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="fu">set.vertex.attribute</span>(nw.sci, <span class="st">&quot;orgtype&quot;</span>, types)</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="fu">set.vertex.attribute</span>(nw.sci, <span class="st">&quot;betweenness&quot;</span>, <span class="fu">betweenness</span>(nw.sci))</span></code></pre></div>
+<hr />
+</div>
+</div>
+<div id="a-simplified-ergm-to-learn-the-workflow" class="section level1" number="4">
+<h1><span class="header-section-number">4</span> A simplified ERGM to
+learn the workflow</h1>
+<p>We first fit a compact six-term ERGM. It is not the final published
+model, but it is the fastest way to learn the four-step
+<code>BFpack</code> workflow.</p>
+<div id="step-1-fit-the-model" class="section level2" number="4.1">
+<h2><span class="header-section-number">4.1</span> Step 1 — Fit the
+model</h2>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>model1 <span class="ot">&lt;-</span> <span class="fu">ergm</span>(</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  nw.pol <span class="sc">~</span> edges <span class="sc">+</span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>    mutual <span class="sc">+</span>                    <span class="co"># reciprocity</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>    <span class="fu">edgecov</span>(nw.sci) <span class="sc">+</span>           <span class="co"># scientific information exchange</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>    <span class="fu">edgecov</span>(prefsim_st) <span class="sc">+</span>       <span class="co"># preference similarity (standardized)</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>    <span class="fu">edgecov</span>(committee_st) <span class="sc">+</span>     <span class="co"># shared committees (standardized)</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>    <span class="fu">edgecov</span>(infrep_st),         <span class="co"># influence attribution (standardized)</span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>  <span class="at">control =</span> <span class="fu">control.ergm</span>(<span class="at">seed =</span> seed)</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>)</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="fu">summary</span>(model1)</span></code></pre></div>
+</div>
+<div id="step-2-read-the-exact-parameter-names" class="section level2" number="4.2">
+<h2><span class="header-section-number">4.2</span> Step 2 — Read the
+exact parameter names</h2>
+<p><strong>This step is essential.</strong> The names
+<code>BFpack</code> expects in a hypothesis string are exactly the names
+printed by <code>get_estimates()</code> — not the covariate object
+names. An <code>edgecov(prefsim_st)</code> term becomes the parameter
+<strong><code>edgecov.prefsim_st</code></strong>.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">get_estimates</span>(model1)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="co">#&gt; Coefficient names include, among others:</span></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="co">#&gt;   edges, mutual, edgecov.nw.sci,</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co">#&gt;   edgecov.prefsim_st, edgecov.committee_st, edgecov.infrep_st</span></span></code></pre></div>
+<blockquote>
+<p><strong>Common pitfall (fixed here).</strong> An earlier draft of
+this script wrote the hypothesis as <code>&quot;edgecov.prefsim = 0&quot;</code>.
+That name does <strong>not</strong> exist — the term is
+<code>edgecov.prefsim_st</code>, so the test would error or silently
+mismatch. Always copy names verbatim from
+<code>get_estimates()</code>.</p>
+</blockquote>
+</div>
+<div id="step-3-4-test-a-precise-null-does-preference-similarity-matter" class="section level2" number="4.3">
+<h2><span class="header-section-number">4.3</span> Step 3 &amp; 4 — Test
+a precise null: does preference similarity matter?</h2>
+<p>The central substantive question from Leifeld &amp; Schneider (2012):
+once opportunity structures are controlled for, does preference
+similarity still drive information exchange, or is its effect fully
+“absorbed”?</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># Step 3: formulate the hypothesis (note the correct parameter name).</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>hypo1 <span class="ot">&lt;-</span> <span class="st">&quot;edgecov.prefsim_st = 0&quot;</span></span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co"># Step 4: BF() fits the Bayesian ERGM internally (this is the slow part),</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co"># then computes the Bayes factor and posterior probabilities. By default the</span></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="co"># null is tested against its complement (the two-sided alternative).</span></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>BF_model1_test1 <span class="ot">&lt;-</span> <span class="fu">BF</span>(model1, <span class="at">hypothesis =</span> hypo1, <span class="at">main.iters =</span> <span class="dv">2000</span>)</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="fu">print</span>(BF_model1_test1)</span></code></pre></div>
+<p><code>print()</code> returns the posterior probabilities of the
+constrained hypothesis <code>H1: beta = 0</code> and its complement
+<code>H2: beta != 0</code>. The key thing to notice — impossible with a
+<em>p</em>-value — is that we can obtain <strong>positive evidence in
+favor of the null</strong>.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># Posterior probabilities that EACH coefficient is zero, negative, or positive.</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="co"># BFpack produces this exploratory test for every parameter by default.</span></span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="fu">summary</span>(BF_model1_test1)</span></code></pre></div>
+<blockquote>
+<p><strong>Interpretation.</strong> Suppose the Bayes factor favors the
+null, <span class="math inline">\(BF_{01} \approx 5\)</span>. Read this
+as: <em>the observed network is about five times more likely under a
+model where preference similarity has no effect than under a model where
+it can take any value.</em> With equal prior odds this maps to a
+posterior probability of roughly 0.83 for the null. Compare that to the
+<em>p</em>-value of .136 from the same data: the <em>p</em>-value only
+says “not significant”, whereas the Bayes factor says “there is positive
+evidence the effect is zero — the non-significance is not just low
+power.” (The exact figures under the full published model are reproduced
+in the section “The full model, reproducing the paper” below.)</p>
+</blockquote>
+<p><em>The illustrative numbers above are for orientation; because
+<code>model1</code> is the simplified specification and because the
+Bayes factor rests on MCMC draws, your exact values will differ
+slightly. The published values appear under the full model
+below.</em></p>
+<hr />
+</div>
+</div>
+<div id="testing-competing-constrained-hypotheses" class="section level1" number="5">
+<h1><span class="header-section-number">5</span> Testing competing
+constrained hypotheses</h1>
+<p>Now the feature that has no clean <em>p</em>-value analogue:
+comparing several substantive theories at once, including <strong>order
+constraints</strong>.</p>
+<p>Based on Leifeld &amp; Schneider we can theorize a <em>ranking</em>
+of importance — shared committees matter most, then influence
+attribution, then preference similarity. We encode three rival
+accounts:</p>
+<ul>
+<li><strong>H1 (ordered):</strong>
+<code>committee &gt; influence &gt; pref.sim &gt; 0</code> — the
+theorized ranking, all positive.</li>
+<li><strong>H2 (equal):</strong>
+<code>committee = influence = pref.sim &gt; 0</code> — the three matter
+equally and positively.</li>
+<li><strong>H3 (null):</strong>
+<code>committee = influence = pref.sim = 0</code> — none of them
+matters.</li>
+</ul>
+<p>By default <code>BF()</code> also adds the
+<strong>complement</strong> (none of H1–H3 holds), so we in fact compare
+four hypotheses.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># Steps 1 and 2 are unchanged (same fitted model, same parameter names).</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="co"># Step 3: formulate the three hypotheses, separated by semicolons.</span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>hyp2 <span class="ot">&lt;-</span> <span class="st">&quot;edgecov.committee_st &gt; edgecov.infrep_st &gt; edgecov.prefsim_st &gt; 0;</span></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="st">         edgecov.committee_st = edgecov.infrep_st = edgecov.prefsim_st &gt; 0;</span></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="st">         edgecov.committee_st = edgecov.infrep_st = edgecov.prefsim_st = 0&quot;</span></span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a><span class="co"># Step 4: compute BFs and posterior probabilities. The complement is added</span></span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a><span class="co"># automatically, so the `complement` argument can be omitted.</span></span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a><span class="co"># </span><span class="al">NOTE</span><span class="co">: we test under model1 (which contains all three terms). An earlier</span></span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a><span class="co"># draft mistakenly passed `model2` here before it was even fitted.</span></span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a>BF_model1_test2 <span class="ot">&lt;-</span> <span class="fu">BF</span>(model1, <span class="at">hypothesis =</span> hyp2, <span class="at">main.iters =</span> <span class="dv">2000</span>)</span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a><span class="fu">print</span>(BF_model1_test2)</span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a></span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a><span class="co"># The full output, including the Specification Table, is worth studying:</span></span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a><span class="fu">summary</span>(BF_model1_test2)</span></code></pre></div>
+<div id="reading-the-specification-table" class="section level3" number="5.0.1">
+<h3><span class="header-section-number">5.0.1</span> Reading the
+specification table</h3>
+<p><code>summary()</code> prints a <strong>specification table</strong>
+that decomposes each Bayes factor into two ingredients:</p>
+<ul>
+<li><strong>relative fit</strong> — how well the constrained hypothesis
+matches the posterior (posterior density at an equality value; posterior
+probability that order constraints hold); and</li>
+<li><strong>relative complexity</strong> — the same quantities under the
+<em>prior</em>.</li>
+</ul>
+<p>The Bayes factor of a hypothesis against the unconstrained model is
+<code>fit / complexity</code>. This is the <strong>Occam’s
+razor</strong>: a hypothesis is rewarded for fitting well but penalized
+for being complex (for carving out a large slice of the parameter space
+a priori). For a pure order constraint on three parameters, the prior
+probability of any one ordering is <code>1/6</code>, so a perfectly
+supported ordering earns a Bayes factor up to 6 against the
+unconstrained model.</p>
+</div>
+<div id="changing-the-prior-probabilities-of-hypotheses" class="section level3" number="5.0.2">
+<h3><span class="header-section-number">5.0.2</span> Changing the prior
+probabilities of hypotheses</h3>
+<p>Equal prior probabilities are the default. If theory or prior
+literature makes some hypotheses more plausible a priori, supply
+<code>prior.hyp.conf</code> (one weight per hypothesis, in order,
+including the complement):</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="co"># Example: down-weight H1/H2/H3 and put more prior mass on the complement.</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>BF_model1_test3 <span class="ot">&lt;-</span> <span class="fu">BF</span>(model1, <span class="at">hypothesis =</span> hyp2,</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>                      <span class="at">main.iters =</span> <span class="dv">2000</span>,</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>                      <span class="at">prior.hyp.conf =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">4</span>))</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="fu">print</span>(BF_model1_test3)</span></code></pre></div>
+<p>The Bayes factors (evidence <em>in the data</em>) are unchanged; only
+the posterior probabilities, which combine evidence with prior odds,
+shift.</p>
+<hr />
+</div>
+</div>
+<div id="the-full-model-reproducing-the-paper" class="section level1" number="6">
+<h1><span class="header-section-number">6</span> The full model,
+reproducing the paper</h1>
+<p>We now fit the full specification — Model 2 of Leifeld &amp;
+Schneider (2012) from the paper. It adds actor-type mixing terms and the
+geometrically weighted shared-partner statistics (GWESP, GWDSP).</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>model2 <span class="ot">&lt;-</span> <span class="fu">ergm</span>(</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  nw.pol <span class="sc">~</span> edges <span class="sc">+</span></span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>    <span class="fu">edgecov</span>(prefsim_st) <span class="sc">+</span></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>    mutual <span class="sc">+</span></span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>    <span class="fu">nodemix</span>(<span class="st">&quot;orgtype&quot;</span>, <span class="at">base =</span> <span class="sc">-</span><span class="dv">7</span>) <span class="sc">+</span></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>    <span class="fu">nodeifactor</span>(<span class="st">&quot;orgtype&quot;</span>, <span class="at">base =</span> <span class="sc">-</span><span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>    <span class="fu">nodeofactor</span>(<span class="st">&quot;orgtype&quot;</span>, <span class="at">base =</span> <span class="sc">-</span><span class="dv">5</span>) <span class="sc">+</span></span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>    <span class="fu">edgecov</span>(committee_st) <span class="sc">+</span></span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>    <span class="fu">edgecov</span>(nw.sci) <span class="sc">+</span></span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>    <span class="fu">edgecov</span>(infrep_st) <span class="sc">+</span></span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>    <span class="fu">gwesp</span>(<span class="fl">0.1</span>, <span class="at">fixed =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>    <span class="fu">gwdsp</span>(<span class="fl">0.1</span>, <span class="at">fixed =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>  <span class="at">control =</span> <span class="fu">control.ergm</span>(<span class="at">seed =</span> seed)</span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>)</span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a><span class="fu">summary</span>(model2)</span></code></pre></div>
+<p>Under this model the paper runs the same two tests we practiced
+above:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co"># Test 1: is the effect of preference similarity zero?</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>hypo1 <span class="ot">&lt;-</span> <span class="st">&quot;edgecov.prefsim_st = 0&quot;</span></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>BF_model2_test1 <span class="ot">&lt;-</span> <span class="fu">BF</span>(model2, <span class="at">hypothesis =</span> hypo1, <span class="at">main.iters =</span> <span class="dv">10000</span>)</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="fu">print</span>(BF_model2_test1)</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a><span class="fu">summary</span>(BF_model2_test1)</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a><span class="co"># Test 2: the ranking of opportunity-structure effects.</span></span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>hyp2 <span class="ot">&lt;-</span> <span class="st">&quot;edgecov.committee_st &gt; edgecov.infrep_st &gt; edgecov.prefsim_st &gt; 0;</span></span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a><span class="st">         edgecov.committee_st = edgecov.infrep_st = edgecov.prefsim_st &gt; 0;</span></span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a><span class="st">         edgecov.committee_st = edgecov.infrep_st = edgecov.prefsim_st = 0&quot;</span></span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>BF_model2_test2 <span class="ot">&lt;-</span> <span class="fu">BF</span>(model2, <span class="at">hypothesis =</span> hyp2, <span class="at">main.iters =</span> <span class="dv">10000</span>)</span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a><span class="fu">print</span>(BF_model2_test2)</span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a><span class="fu">summary</span>(BF_model2_test2)</span></code></pre></div>
+<blockquote>
+<p><strong>Note on <code>main.iters</code>.</strong> For a polished
+analysis the paper uses <code>main.iters = 10000</code> posterior draws
+for accurate Bayes factors. That is slow. For live exploration in the
+workshop, keep <code>main.iters = 2000</code> (or the <code>bergm</code>
+default) to avoid long waits, then increase it for final results.</p>
+</blockquote>
+<div id="published-results" class="section level2" number="6.1">
+<h2><span class="header-section-number">6.1</span> Published
+results</h2>
+<div id="test-1-no-effect-of-preference-similarity" class="section level3" number="6.1.1">
+<h3><span class="header-section-number">6.1.1</span> Test 1 — no effect
+of preference similarity</h3>
+<p>Under Model 2 the posterior and prior density of <span class="math inline">\(\beta_{\text{pref.sim}}\)</span> at zero are
+<strong>2.04</strong> and <strong>0.387</strong>, giving</p>
+<p><span class="math display">\[BF_{01} = \frac{2.04}{0.387} \approx
+5.2,\]</span></p>
+<p>i.e. <strong>positive evidence that preference similarity has no
+additional effect</strong> on information exchange once opportunity
+structures are controlled. With equal prior probabilities the posterior
+probabilities are</p>
+<p><span class="math display">\[P(H_1 \mid Y) = 0.839, \qquad P(H_2 \mid
+Y) = 0.161.\]</span></p>
+<p>The classical two-sided <em>p</em>-value on the same coefficient is
+<strong>.136</strong> — “non-significant”, but silent on whether that
+reflects a true zero or an underpowered study. The Bayes factor resolves
+the ambiguity in favor of a genuine null. (For reference, the BIC-based
+evidence is 13.63 and the AIC-based evidence 1.26, bracketing the Bayes
+factor, since BIC leans toward the simpler model and AIC toward the
+larger one.)</p>
+<p><strong>Table 1. Full coefficient-level results under Model 2
+(Application A).</strong> Classical estimates, Bayesian estimates under
+the unit-information prior, and posterior probabilities that each
+coefficient is zero, negative, or positive (equal prior
+probabilities).</p>
+<table>
+<colgroup>
+<col width="8%" />
+<col width="11%" />
+<col width="11%" />
+<col width="11%" />
+<col width="11%" />
+<col width="11%" />
+<col width="11%" />
+<col width="11%" />
+<col width="11%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Term</th>
+<th align="right">MLE</th>
+<th align="right">s.e.</th>
+<th align="right"><em>p</em></th>
+<th align="right">post. mean</th>
+<th align="right">post. sd</th>
+<th align="right"><span class="math inline">\(P(\beta{=}0\mid
+Y)\)</span></th>
+<th align="right"><span class="math inline">\(P(\beta{&lt;}0\mid
+Y)\)</span></th>
+<th align="right"><span class="math inline">\(P(\beta{&gt;}0\mid
+Y)\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>edges</td>
+<td align="right">−4.039</td>
+<td align="right">1.290</td>
+<td align="right">0.002</td>
+<td align="right">−2.525</td>
+<td align="right">0.675</td>
+<td align="right">–</td>
+<td align="right">–</td>
+<td align="right">–</td>
+</tr>
+<tr class="even">
+<td>pref. sim. (st.)</td>
+<td align="right">0.118</td>
+<td align="right">0.079</td>
+<td align="right">0.136</td>
+<td align="right">0.116</td>
+<td align="right">0.106</td>
+<td align="right"><strong>0.722</strong></td>
+<td align="right">0.037</td>
+<td align="right">0.241</td>
+</tr>
+<tr class="odd">
+<td>reciprocity</td>
+<td align="right">0.808</td>
+<td align="right">0.248</td>
+<td align="right">0.001</td>
+<td align="right">0.765</td>
+<td align="right">0.298</td>
+<td align="right">0.138</td>
+<td align="right">0.005</td>
+<td align="right">0.857</td>
+</tr>
+<tr class="even">
+<td>int. group homophily</td>
+<td align="right">1.067</td>
+<td align="right">0.291</td>
+<td align="right">0.000</td>
+<td align="right">1.222</td>
+<td align="right">0.485</td>
+<td align="right">0.178</td>
+<td align="right">0.005</td>
+<td align="right">0.817</td>
+</tr>
+<tr class="odd">
+<td>gov. target</td>
+<td align="right">0.597</td>
+<td align="right">0.189</td>
+<td align="right">0.002</td>
+<td align="right">0.561</td>
+<td align="right">0.248</td>
+<td align="right">0.259</td>
+<td align="right">0.009</td>
+<td align="right">0.732</td>
+</tr>
+<tr class="even">
+<td>sci. source</td>
+<td align="right">0.072</td>
+<td align="right">0.218</td>
+<td align="right">0.742</td>
+<td align="right">0.063</td>
+<td align="right">0.269</td>
+<td align="right">0.822</td>
+<td align="right">0.072</td>
+<td align="right">0.106</td>
+</tr>
+<tr class="odd">
+<td>common committees (st.)</td>
+<td align="right">0.727</td>
+<td align="right">0.122</td>
+<td align="right">0.000</td>
+<td align="right">0.839</td>
+<td align="right">0.173</td>
+<td align="right">0.000</td>
+<td align="right">0.000</td>
+<td align="right"><strong>1.000</strong></td>
+</tr>
+<tr class="even">
+<td>sci. communication</td>
+<td align="right">2.910</td>
+<td align="right">0.630</td>
+<td align="right">0.000</td>
+<td align="right">2.935</td>
+<td align="right">1.006</td>
+<td align="right">0.039</td>
+<td align="right">0.002</td>
+<td align="right">0.958</td>
+</tr>
+<tr class="odd">
+<td>infl. attr. (st.)</td>
+<td align="right">0.439</td>
+<td align="right">0.088</td>
+<td align="right">0.000</td>
+<td align="right">0.438</td>
+<td align="right">0.114</td>
+<td align="right">0.003</td>
+<td align="right">0.000</td>
+<td align="right">0.997</td>
+</tr>
+<tr class="even">
+<td>GWESP(0.1)</td>
+<td align="right">2.552</td>
+<td align="right">1.129</td>
+<td align="right">0.024</td>
+<td align="right">1.363</td>
+<td align="right">0.597</td>
+<td align="right">0.094</td>
+<td align="right">0.012</td>
+<td align="right">0.895</td>
+</tr>
+<tr class="odd">
+<td>GWDSP(0.1)</td>
+<td align="right">−0.134</td>
+<td align="right">0.049</td>
+<td align="right">0.007</td>
+<td align="right">−0.208</td>
+<td align="right">0.087</td>
+<td align="right">0.146</td>
+<td align="right">0.847</td>
+<td align="right">0.007</td>
+</tr>
+</tbody>
+</table>
+<p><em>(No Bayesian test is reported for <code>edges</code>: an improper
+flat prior is used for this nuisance intercept, and flat priors cannot
+be used for Bayes-factor testing.)</em></p>
+</div>
+<div id="test-2-the-ranking-of-opportunity-structure-effects" class="section level3" number="6.1.2">
+<h3><span class="header-section-number">6.1.2</span> Test 2 — the
+ranking of opportunity-structure effects</h3>
+<p><strong>Table 2. Bayes factors and posterior probabilities for the
+three constrained hypotheses (equal prior probabilities).</strong></p>
+<table>
+<colgroup>
+<col width="15%" />
+<col width="21%" />
+<col width="21%" />
+<col width="21%" />
+<col width="21%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Hypothesis</th>
+<th align="right">vs H1</th>
+<th align="right">vs H2</th>
+<th align="right">vs H3</th>
+<th align="right"><span class="math inline">\(P(H_t\mid Y)\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>H1:</strong> committee &gt; influence &gt; pref.sim</td>
+<td align="right">1.000</td>
+<td align="right">74.335</td>
+<td align="right">97.953</td>
+<td align="right"><strong>.977</strong></td>
+</tr>
+<tr class="even">
+<td><strong>H2:</strong> committee = influence = pref.sim &gt; 0</td>
+<td align="right">0.013</td>
+<td align="right">1.000</td>
+<td align="right">1.318</td>
+<td align="right">.013</td>
+</tr>
+<tr class="odd">
+<td><strong>H3:</strong> committee = influence = pref.sim = 0</td>
+<td align="right">0.010</td>
+<td align="right">0.759</td>
+<td align="right">1.000</td>
+<td align="right">.010</td>
+</tr>
+</tbody>
+</table>
+<p>The ordered hypothesis H1 receives about <strong>74×</strong> the
+evidence of the equality hypothesis and about <strong>98×</strong> that
+of the complement, and carries a posterior probability of roughly
+<strong>98%</strong>. After seeing the data, then, there is strong
+support for the theorized ranking: the (standardized) effect of shared
+committees is largest, followed by influence attribution, followed by
+preference similarity — consistent with the point estimates in Table
+1.</p>
+<hr />
+</div>
+</div>
+</div>
+<div id="reporting-and-interpretation-checklist" class="section level1" number="7">
+<h1><span class="header-section-number">7</span> Reporting and
+interpretation checklist</h1>
+<p>When you write up a <code>BFpack</code> ERGM analysis, report:</p>
+<ul>
+<li>the <strong>fitted ERGM specification</strong> and how each
+covariate was constructed;</li>
+<li>the exact <strong>hypotheses</strong> in constraint notation, with
+their substantive meaning;</li>
+<li>the <strong>Bayes factors</strong> between hypotheses (and/or
+against the unconstrained model) and the <strong>posterior
+probabilities</strong>, stating the prior probabilities used;</li>
+<li>for a contested null, the <strong>posterior/prior density ratio at
+zero</strong> that produces <span class="math inline">\(BF_{01}\)</span>, which mirrors Bayesian
+estimation; and</li>
+<li>the number of posterior draws (<code>main.iters</code>) and the
+seed, for reproducibility.</li>
+</ul>
+<p>Finally note that posterior probabilities live on a
+<strong>continuous</strong> scale — no dichotomous accept/reject
+decision is required — and if you <em>do</em> commit to a hypothesis,
+<span class="math inline">\(1 - P(H\mid Y)\)</span> is the conditional
+probability of being wrong given this network (e.g. ~16% for the null in
+Test 1, ~2% for H1 in Test 2).</p>
+<hr />
+</div>
+<div id="references" class="section level1" number="8">
+<h1><span class="header-section-number">8</span> References</h1>
+<p>Caimo, A., &amp; Friel, N. (2014). Bergm: Bayesian exponential random
+graphs in R. <em>Journal of Statistical Software, 61</em>(2), 1–25.</p>
+<p>Leifeld, P., &amp; Schneider, V. (2012). Information exchange in
+policy networks. <em>American Journal of Political Science, 56</em>(3),
+731–744.</p>
+<p>Mulder, J., Friel, N., &amp; Leifeld, P. (2024). Bayesian testing of
+scientific expectations under exponential random graph models.
+<em>Social Networks, 78</em>, 40–53. <a href="https://doi.org/10.1016/j.socnet.2023.11.004" class="uri">https://doi.org/10.1016/j.socnet.2023.11.004</a></p>
+<p>Mulder, J., et al. (2021). BFpack: Flexible Bayes factor testing of
+scientific expectations in R. <em>Journal of Statistical
+Software.</em></p>
+<hr />
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

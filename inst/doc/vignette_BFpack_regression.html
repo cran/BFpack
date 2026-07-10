@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Joris Mulder" />
+
+<meta name="date" content="2026-07-10" />
+
+<title>Directly Comparing Constrained Hypotheses in Regression with BFpack</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Directly Comparing Constrained Hypotheses
+in Regression with BFpack</h1>
+<h4 class="author">Joris Mulder</h4>
+<h4 class="date">2026-07-10</h4>
+
+
+<div id="TOC">
+<ul>
+<li><a href="#introduction-and-learning-objectives" id="toc-introduction-and-learning-objectives"><span class="toc-section-number">1</span> Introduction and learning
+objectives</a>
+<ul>
+<li><a href="#the-running-example" id="toc-the-running-example"><span class="toc-section-number">1.1</span> The running example</a></li>
+<li><a href="#what-you-will-be-able-to-do" id="toc-what-you-will-be-able-to-do"><span class="toc-section-number">1.2</span> What you will be able to
+do</a></li>
+</ul></li>
+<li><a href="#setup-packages-data-and-model" id="toc-setup-packages-data-and-model"><span class="toc-section-number">2</span> Setup: packages, data, and
+model</a></li>
+<li><a href="#the-joint-directional-test-in-bfpack" id="toc-the-joint-directional-test-in-bfpack"><span class="toc-section-number">3</span> The joint directional test in
+BFpack</a>
+<ul>
+<li><a href="#step-1-read-the-exact-parameter-names" id="toc-step-1-read-the-exact-parameter-names"><span class="toc-section-number">3.1</span> Step 1 — Read the exact parameter
+names</a></li>
+<li><a href="#step-2-formulate-the-hypotheses" id="toc-step-2-formulate-the-hypotheses"><span class="toc-section-number">3.2</span> Step 2 — Formulate the
+hypotheses</a></li>
+<li><a href="#results" id="toc-results"><span class="toc-section-number">3.3</span> Results</a></li>
+</ul></li>
+<li><a href="#why-not-just-test-each-coefficient-and-contrast-separately" id="toc-why-not-just-test-each-coefficient-and-contrast-separately"><span class="toc-section-number">4</span> Why not just test each coefficient
+and contrast separately?</a></li>
+<li><a href="#references" id="toc-references"><span class="toc-section-number">5</span> References</a></li>
+</ul>
+</div>
+
+<blockquote>
+<p><strong>How to use this document.</strong> Every code block below can
+be pasted into an R session and run in order. To keep the vignette light
+(and fast to check on CRAN) the chunks are <em>not</em> executed while
+knitting (<code>eval = FALSE</code> in the setup chunk); instead the
+expected results are reported and discussed in the text and tables. To
+run the analysis live, change <code>eval = FALSE</code> to
+<code>eval = TRUE</code>, or simply copy each block into R.</p>
+</blockquote>
+<p><em>This vignette is based on “Challenge I” of Mulder, J., &amp;
+Pfadt, J. M. (2026), “Going in the right direction: A tutorial to
+directional hypothesis testing using the BFpack module in JASP,”
+Advances in Methods and Practices in Psychological Science. It adapts
+that example into a hands-on tutorial for the <code>BFpack</code> R
+package (the JASP module wraps the same engine). The data and R syntax
+are available on the online supplement, <a href="https://osf.io/7q5pf/" class="uri">https://osf.io/7q5pf/</a>.</em></p>
+<hr />
+<div id="introduction-and-learning-objectives" class="section level1" number="1">
+<h1><span class="header-section-number">1</span> Introduction and
+learning objectives</h1>
+<p>Substantive theories rarely predict merely that “some effect is
+non-zero.” They predict a <em>pattern</em>: which predictors matter, and
+how their effects are ordered relative to one another. The conventional
+workflow answers such questions indirectly — one significance test per
+coefficient and per contrast, followed by a multiplicity correction —
+and then asks the reader to reassemble the pieces into support for a
+theory. This tutorial shows the direct alternative: <strong>translating
+each competing theory into a single constrained hypothesis and comparing
+them head-to-head with Bayes factors</strong> using
+<code>BFpack</code>.</p>
+<div id="the-running-example" class="section level2" number="1.1">
+<h2><span class="header-section-number">1.1</span> The running
+example</h2>
+<p>A large literature in social and political psychology argues that
+perceived competition and status threat shape attitudes toward immigrant
+groups. Within <strong>Ethnic Competition Theory</strong> (Scheepers et
+al., 2002), socioeconomic position — social class, education, and income
+— is positively associated with attitudes toward immigrants. Different
+theoretical accounts, however, predict different <em>orderings</em> of
+these three effects. We compare three theory-consistent variants plus a
+complement, using European Values Study (EVS) data from Germany.</p>
+<p>We fit a linear regression of <code>attitude</code> on
+<code>class</code>, <code>education</code>, and <code>income</code>,
+with <code>gender</code> as a covariate, and test:</p>
+<p><span class="math display">\[
+\begin{aligned}
+\mathcal{H}_1 &amp;:\ \beta_{\text{class}} &gt; \beta_{\text{education}}
+&gt; \beta_{\text{income}} &gt; 0
+   \quad(\text{strict ordering: class matters most}),\\
+\mathcal{H}_2 &amp;:\ \beta_{\text{education}} &gt;
+(\beta_{\text{class}}, \beta_{\text{income}}) &gt; 0
+   \quad(\text{education largest; class and income unordered}),\\
+\mathcal{H}_3 &amp;:\ \beta_{\text{class}} = \beta_{\text{education}} =
+\beta_{\text{income}} &gt; 0
+   \quad(\text{three equal positive effects}),\\
+\mathcal{H}_4 &amp;:\ \text{complement (none of }
+\mathcal{H}_1,\mathcal{H}_2,\mathcal{H}_3).
+\end{aligned}
+\]</span></p>
+<p>A traditional point-null in which all three effects are zero is not
+of substantive interest here and is therefore excluded.</p>
+</div>
+<div id="what-you-will-be-able-to-do" class="section level2" number="1.2">
+<h2><span class="header-section-number">1.2</span> What you will be able
+to do</h2>
+<p>By the end you will be able to:</p>
+<ul>
+<li>fit a linear regression and read the exact coefficient names with
+<code>get_estimates()</code>;</li>
+<li>encode competing ordering / equality expectations as a
+<code>BFpack</code> hypothesis string using <code>&gt;</code>,
+<code>=</code>, <code>(,)</code>, and <code>;</code>;</li>
+<li>compute Bayes factors and posterior probabilities with
+<code>BF()</code> and interpret them; and</li>
+<li>see why the equivalent <em>classical</em> route — separate
+coefficient and contrast tests with a multiplicity correction — gives
+only fragmented, and sometimes intransitive, evidence.</li>
+</ul>
+<hr />
+</div>
+</div>
+<div id="setup-packages-data-and-model" class="section level1" number="2">
+<h1><span class="header-section-number">2</span> Setup: packages, data,
+and model</h1>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># install.packages(&quot;BFpack&quot;)   # once, if needed</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;BFpack&quot;</span>)</span></code></pre></div>
+<p>The data set <code>regression_EVS_Germany.csv</code> lives on the OSF
+project <a href="https://osf.io/7q5pf/" class="uri">https://osf.io/7q5pf/</a>. The <code>osfr</code> package can
+pull it directly from that project ID in a single call — no manual
+download, no hard-coded file link:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">&quot;osfr&quot;</span>)   <span class="co"># once, if needed</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;osfr&quot;</span>)            <span class="co"># must be loaded before the download call below</span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>EVS_Germany <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="fu">osf_download</span>(</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="fu">osf_ls_files</span>(<span class="fu">osf_retrieve_node</span>(<span class="st">&quot;7q5pf&quot;</span>),</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>               <span class="at">pattern =</span> <span class="st">&quot;regression_EVS_Germany.csv&quot;</span>),</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>  <span class="at">conflicts =</span> <span class="st">&quot;overwrite&quot;</span>)<span class="sc">$</span>local_path)</span></code></pre></div>
+<blockquote>
+<p><strong>Prefer to avoid a dependency?</strong> Download
+<code>regression_EVS_Germany.csv</code> manually from <a href="https://osf.io/7q5pf/" class="uri">https://osf.io/7q5pf/</a> and
+read it locally with
+<code>read.csv(&quot;regression_EVS_Germany.csv&quot;)</code>. If you know the
+file’s own OSF short link,
+<code>read.csv(&quot;https://osf.io/&lt;id&gt;/download&quot;)</code> is an
+equivalent one-liner.</p>
+</blockquote>
+<p>We drop incomplete cases, <strong>standardize</strong> the continuous
+variables so that the coefficients are on a common scale (essential for
+the ordering tests — an ordering of coefficients is then an ordering of
+<em>effect sizes</em>), and treat <code>gender</code> as a factor:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>EVS_Germany <span class="ot">&lt;-</span> EVS_Germany[<span class="fu">complete.cases</span>(EVS_Germany), ]</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>EVS_Germany<span class="sc">$</span>attitude  <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">scale</span>(EVS_Germany<span class="sc">$</span>attitude))</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>EVS_Germany<span class="sc">$</span>education  <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">scale</span>(EVS_Germany<span class="sc">$</span>education))</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>EVS_Germany<span class="sc">$</span>income     <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">scale</span>(EVS_Germany<span class="sc">$</span>income))</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>EVS_Germany<span class="sc">$</span>class      <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">scale</span>(EVS_Germany<span class="sc">$</span>class))</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>EVS_Germany<span class="sc">$</span>gender     <span class="ot">&lt;-</span> <span class="fu">as.factor</span>(EVS_Germany<span class="sc">$</span>gender)</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>fit1 <span class="ot">&lt;-</span> <span class="fu">lm</span>(attitude <span class="sc">~</span> education <span class="sc">+</span> income <span class="sc">+</span> gender <span class="sc">+</span> class, <span class="at">data =</span> EVS_Germany)</span></code></pre></div>
+<hr />
+</div>
+<div id="the-joint-directional-test-in-bfpack" class="section level1" number="3">
+<h1><span class="header-section-number">3</span> The joint directional
+test in BFpack</h1>
+<div id="step-1-read-the-exact-parameter-names" class="section level2" number="3.1">
+<h2><span class="header-section-number">3.1</span> Step 1 — Read the
+exact parameter names</h2>
+<p><strong>This step is essential.</strong> The names used in a
+hypothesis string are exactly the names printed by
+<code>get_estimates()</code>. For this model the three predictors of
+interest appear simply as <code>class</code>, <code>education</code>,
+and <code>income</code> (the factor <code>gender</code> appears as
+<code>gender1</code>).</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">get_estimates</span>(fit1)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="co">#&gt; Coefficient names include: education, income, gender1, class</span></span></code></pre></div>
+</div>
+<div id="step-2-formulate-the-hypotheses" class="section level2" number="3.2">
+<h2><span class="header-section-number">3.2</span> Step 2 — Formulate
+the hypotheses</h2>
+<p>Each theory becomes one constrained hypothesis; hypotheses are
+separated by semicolons. <code>(class, income)</code> in <span class="math inline">\(\mathcal{H}_2\)</span> means both are larger than
+0 but <em>unordered</em> relative to each other. We do
+<strong>not</strong> write <span class="math inline">\(\mathcal{H}_4\)</span> explicitly:
+<code>complement = TRUE</code> adds it automatically.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">1</span>)   <span class="co"># the equality/order tests use sampling; fix the seed.</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>BF_App1 <span class="ot">&lt;-</span> <span class="fu">BF</span>(fit1,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">hypothesis =</span> <span class="st">&quot;class &gt; education &gt; income &gt; 0;</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="st">                education &gt; (class, income) &gt; 0;</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="st">                class = education = income &gt; 0&quot;</span>,</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>  <span class="at">complement =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="fu">print</span>(BF_App1)</span></code></pre></div>
+<p>By default the four hypotheses receive equal prior probabilities of
+<span class="math inline">\(1/4\)</span>. To weight them differently,
+pass <code>prior.hyp.conf</code> (one weight per hypothesis, in order,
+including the complement) — this shifts the posterior probabilities but
+leaves the Bayes factors, which measure the evidence <em>in the
+data</em>, unchanged.</p>
+</div>
+<div id="results" class="section level2" number="3.3">
+<h2><span class="header-section-number">3.3</span> Results</h2>
+<p><strong>Table 1. Bayes factors (rows vs. columns) and posterior
+probabilities for the four hypotheses (equal prior probabilities, seed =
+1).</strong></p>
+<table>
+<colgroup>
+<col width="13%" />
+<col width="17%" />
+<col width="17%" />
+<col width="17%" />
+<col width="17%" />
+<col width="17%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Hypothesis</th>
+<th align="right">vs <span class="math inline">\(\mathcal{H}_1\)</span></th>
+<th align="right">vs <span class="math inline">\(\mathcal{H}_2\)</span></th>
+<th align="right">vs <span class="math inline">\(\mathcal{H}_3\)</span></th>
+<th align="right">vs <span class="math inline">\(\mathcal{H}_4\)</span></th>
+<th align="right"><span class="math inline">\(P(\mathcal{H}_t\mid\text{Data})\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong><span class="math inline">\(\mathcal{H}_1\)</span>:</strong>
+class &gt; education &gt; income &gt; 0</td>
+<td align="right">1.000</td>
+<td align="right">0.312</td>
+<td align="right">1.059</td>
+<td align="right">49.53</td>
+<td align="right">0.193</td>
+</tr>
+<tr class="even">
+<td><strong><span class="math inline">\(\mathcal{H}_2\)</span>:</strong>
+education &gt; (class, income) &gt; 0</td>
+<td align="right">3.207</td>
+<td align="right">1.000</td>
+<td align="right">3.397</td>
+<td align="right">158.8</td>
+<td align="right"><strong>0.620</strong></td>
+</tr>
+<tr class="odd">
+<td><strong><span class="math inline">\(\mathcal{H}_3\)</span>:</strong>
+class = education = income &gt; 0</td>
+<td align="right">0.944</td>
+<td align="right">0.294</td>
+<td align="right">1.000</td>
+<td align="right">46.75</td>
+<td align="right">0.183</td>
+</tr>
+<tr class="even">
+<td><strong><span class="math inline">\(\mathcal{H}_4\)</span>:</strong>
+complement</td>
+<td align="right">0.020</td>
+<td align="right">0.006</td>
+<td align="right">0.021</td>
+<td align="right">1.000</td>
+<td align="right">0.004</td>
+</tr>
+</tbody>
+</table>
+<p>All three theory-consistent hypotheses receive strong evidence over
+the complement, and <span class="math inline">\(\mathcal{H}_2\)</span>
+is favored among <span class="math inline">\(\mathcal{H}_1\)</span>–<span class="math inline">\(\mathcal{H}_3\)</span> (though the evidence is
+mild, with Bayes factors around 3). A possible write-up:</p>
+<blockquote>
+<p>“The model comparison favored <span class="math inline">\(\mathcal{H}_2\)</span> with a posterior
+probability of .620, suggesting the largest positive effect for
+education, followed by class and income. Evidence distinguishing <span class="math inline">\(\mathcal{H}_2\)</span> from <span class="math inline">\(\mathcal{H}_1\)</span> and <span class="math inline">\(\mathcal{H}_3\)</span> was mild (Bayes factors of
+approximately 3). All three theory-consistent hypotheses strongly
+outperformed the complement (Bayes factors of 49.5, 159, and 46.7),
+indicating that parameter configurations inconsistent with Ethnic
+Competition Theory are unlikely given the data.”</p>
+</blockquote>
+<p>Note how a <em>single</em> comparison expresses the relative support
+for each whole theory — exactly what the substantive question asks, and
+exactly what a collection of separate tests cannot deliver.</p>
+<hr />
+</div>
+</div>
+<div id="why-not-just-test-each-coefficient-and-contrast-separately" class="section level1" number="4">
+<h1><span class="header-section-number">4</span> Why not just test each
+coefficient and contrast separately?</h1>
+<p>The classical route tests the three coefficients and their three
+pairwise contrasts one at a time, then corrects for multiplicity.
+Because jointly testing coefficients and contrasts is awkward in common
+GUI software, we implement it in R with <code>multcomp</code> and
+<code>car</code>. The contrast matrix <code>K_eq</code> has one row per
+null hypothesis; its columns follow the model’s design-matrix order:
+<code>(Intercept), education, income, gender1, class</code>.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;multcomp&quot;</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;car&quot;</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>K_eq <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="st">&quot;class - education = 0&quot;</span>  <span class="ot">=</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="sc">-</span><span class="dv">1</span>,  <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>),</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="st">&quot;class - income = 0&quot;</span>     <span class="ot">=</span> <span class="fu">c</span>(<span class="dv">0</span>,  <span class="dv">0</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">1</span>),</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>  <span class="st">&quot;education - income = 0&quot;</span> <span class="ot">=</span> <span class="fu">c</span>(<span class="dv">0</span>,  <span class="dv">1</span>, <span class="sc">-</span><span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>),</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>  <span class="st">&quot;class = 0&quot;</span>              <span class="ot">=</span> <span class="fu">c</span>(<span class="dv">0</span>,  <span class="dv">0</span>,  <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>),</span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>  <span class="st">&quot;education = 0&quot;</span>          <span class="ot">=</span> <span class="fu">c</span>(<span class="dv">0</span>,  <span class="dv">1</span>,  <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>),</span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>  <span class="st">&quot;income = 0&quot;</span>             <span class="ot">=</span> <span class="fu">c</span>(<span class="dv">0</span>,  <span class="dv">0</span>,  <span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>)</span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>)</span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a></span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a>glht_eq <span class="ot">&lt;-</span> multcomp<span class="sc">::</span><span class="fu">glht</span>(fit1, <span class="at">linfct =</span> K_eq)   <span class="co"># two-sided by default</span></span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>ci_eq   <span class="ot">&lt;-</span> <span class="fu">confint</span>(glht_eq)                        <span class="co"># 95% (unadjusted) CIs</span></span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>sm_eq   <span class="ot">&lt;-</span> <span class="fu">summary</span>(glht_eq, <span class="at">test =</span> <span class="fu">adjusted</span>(<span class="st">&quot;holm&quot;</span>))  <span class="co"># Holm-adjusted p-values</span></span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a></span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a>res <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a>  <span class="at">Null_hypothesis =</span> <span class="fu">names</span>(sm_eq<span class="sc">$</span>test<span class="sc">$</span>coefficients),</span>
+<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a>  <span class="at">Estimate        =</span> <span class="fu">as.numeric</span>(sm_eq<span class="sc">$</span>test<span class="sc">$</span>coefficients),</span>
+<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a>  <span class="at">LB_95           =</span> ci_eq<span class="sc">$</span>confint[, <span class="st">&quot;lwr&quot;</span>],</span>
+<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a>  <span class="at">UB_95           =</span> ci_eq<span class="sc">$</span>confint[, <span class="st">&quot;upr&quot;</span>],</span>
+<span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a>  <span class="at">t_value         =</span> <span class="fu">as.numeric</span>(sm_eq<span class="sc">$</span>test<span class="sc">$</span>tstat),</span>
+<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a>  <span class="at">p_adjusted      =</span> <span class="fu">as.numeric</span>(sm_eq<span class="sc">$</span>test<span class="sc">$</span>pvalues),</span>
+<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a>  <span class="at">row.names       =</span> <span class="cn">NULL</span></span>
+<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a>)</span>
+<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">cbind</span>(<span class="at">Null_hypothesis =</span> res[, <span class="dv">1</span>], <span class="fu">round</span>(res[, <span class="sc">-</span><span class="dv">1</span>], <span class="dv">3</span>)))</span></code></pre></div>
+<p><strong>Table 2. Null hypotheses on individual effects and pairwise
+contrasts. Confidence bounds are unadjusted; <span class="math inline">\(p\)</span>-values are Holm-adjusted.</strong></p>
+<table>
+<colgroup>
+<col width="13%" />
+<col width="17%" />
+<col width="17%" />
+<col width="17%" />
+<col width="17%" />
+<col width="17%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Null hypothesis</th>
+<th align="right">Estimate</th>
+<th align="right">95%-LB</th>
+<th align="right">95%-UB</th>
+<th align="right"><span class="math inline">\(t\)</span> value</th>
+<th align="right">Adjusted <span class="math inline">\(p\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><span class="math inline">\(\beta_{\text{class}} -
+\beta_{\text{education}} = 0\)</span></td>
+<td align="right">−0.055</td>
+<td align="right">−0.178</td>
+<td align="right">0.067</td>
+<td align="right">−1.124</td>
+<td align="right">0.522</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(\beta_{\text{class}} -
+\beta_{\text{income}} = 0\)</span></td>
+<td align="right">0.081</td>
+<td align="right">−0.022</td>
+<td align="right">0.184</td>
+<td align="right">1.962</td>
+<td align="right">0.150</td>
+</tr>
+<tr class="odd">
+<td><span class="math inline">\(\beta_{\text{education}} -
+\beta_{\text{income}} = 0\)</span></td>
+<td align="right">0.137</td>
+<td align="right">0.031</td>
+<td align="right">0.242</td>
+<td align="right">3.230</td>
+<td align="right">0.005</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(\beta_{\text{class}} = 0\)</span></td>
+<td align="right">0.106</td>
+<td align="right">0.034</td>
+<td align="right">0.178</td>
+<td align="right">3.672</td>
+<td align="right">0.001</td>
+</tr>
+<tr class="odd">
+<td><span class="math inline">\(\beta_{\text{education}} =
+0\)</span></td>
+<td align="right">0.161</td>
+<td align="right">0.090</td>
+<td align="right">0.233</td>
+<td align="right">5.599</td>
+<td align="right">0.000</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(\beta_{\text{income}} = 0\)</span></td>
+<td align="right">0.025</td>
+<td align="right">−0.039</td>
+<td align="right">0.089</td>
+<td align="right">0.960</td>
+<td align="right">0.522</td>
+</tr>
+</tbody>
+</table>
+<p>This yields only fragmented evidence about the hypotheses of
+interest. At <span class="math inline">\(\alpha = .05\)</span> the
+effects of <code>class</code> and <code>education</code> are significant
+and positive while <code>income</code> is not; yet the contrast <span class="math inline">\(\beta_{\text{class}} -
+\beta_{\text{income}}\)</span> is nonsignificant while <span class="math inline">\(\beta_{\text{education}} -
+\beta_{\text{income}}\)</span> is significant. These partly conflicting
+results arise because <strong>statistical significance is not transitive
+across separate tests</strong>: <code>class</code> and
+<code>education</code> both differing from zero while
+<code>income</code> does not need not imply that every contrast lines up
+accordingly.</p>
+<p>Consequently the separate tests give no coherent ordering of the
+three effects and no way to quantify support for the competing theories.
+Eyeballing the estimates and CIs suggests the data most favor <span class="math inline">\(\mathcal{H}_2\)</span> (largest effect for
+education) — but <em>how much</em> more than <span class="math inline">\(\mathcal{H}_1\)</span>, <span class="math inline">\(\mathcal{H}_3\)</span>, or <span class="math inline">\(\mathcal{H}_4\)</span> remains unclear. The joint
+Bayes-factor test in the previous section answers exactly that question
+with a single set of numbers.</p>
+<hr />
+</div>
+<div id="references" class="section level1" number="5">
+<h1><span class="header-section-number">5</span> References</h1>
+<p>Mulder, J. (2016). Bayes factors for testing order-constrained
+hypotheses on correlations. <em>Journal of Mathematical
+Psychology.</em></p>
+<p>Mulder, J., &amp; Pfadt, J. M. (2026). Going in the right direction:
+A tutorial to directional hypothesis testing using the BFpack module in
+JASP. <em>Advances in Methods and Practices in Psychological
+Science.</em></p>
+<p>Mulder, J., et al. (2021). BFpack: Flexible Bayes factor testing of
+scientific expectations in R. <em>Journal of Statistical Software,
+100</em>(18), 1–63.</p>
+<p>Scheepers, P., Gijsberts, M., &amp; Coenders, M. (2002). Ethnic
+exclusionism in European countries. <em>European Sociological Review,
+18</em>(1), 17–34.</p>
+<hr />
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

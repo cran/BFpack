@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Joris Mulder" />
+
+<meta name="date" content="2026-07-10" />
+
+<title>Jointly testing Directional Expectations on Correlations with BFpack</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Jointly testing Directional Expectations on
+Correlations with BFpack</h1>
+<h4 class="author">Joris Mulder</h4>
+<h4 class="date">2026-07-10</h4>
+
+
+<div id="TOC">
+<ul>
+<li><a href="#introduction-and-learning-objectives" id="toc-introduction-and-learning-objectives"><span class="toc-section-number">1</span> Introduction and learning
+objectives</a>
+<ul>
+<li><a href="#the-running-example" id="toc-the-running-example"><span class="toc-section-number">1.1</span> The running example</a></li>
+<li><a href="#what-you-will-be-able-to-do" id="toc-what-you-will-be-able-to-do"><span class="toc-section-number">1.2</span> What you will be able to
+do</a></li>
+</ul></li>
+<li><a href="#setup-packages-seed-and-data" id="toc-setup-packages-seed-and-data"><span class="toc-section-number">2</span> Setup: packages, seed, and
+data</a></li>
+<li><a href="#the-joint-directional-test-in-bfpack" id="toc-the-joint-directional-test-in-bfpack"><span class="toc-section-number">3</span> The joint directional test in
+BFpack</a>
+<ul>
+<li><a href="#step-1-estimate-the-correlations-per-group" id="toc-step-1-estimate-the-correlations-per-group"><span class="toc-section-number">3.1</span> Step 1 — Estimate the correlations
+per group</a></li>
+<li><a href="#step-2-read-the-exact-parameter-names" id="toc-step-2-read-the-exact-parameter-names"><span class="toc-section-number">3.2</span> Step 2 — Read the exact parameter
+names</a></li>
+<li><a href="#step-3-formulate-the-hypotheses" id="toc-step-3-formulate-the-hypotheses"><span class="toc-section-number">3.3</span> Step 3 — Formulate the
+hypotheses</a></li>
+<li><a href="#step-4-compute-the-bayes-factors" id="toc-step-4-compute-the-bayes-factors"><span class="toc-section-number">3.4</span> Step 4 — Compute the Bayes
+factors</a></li>
+<li><a href="#results" id="toc-results"><span class="toc-section-number">3.5</span> Results</a></li>
+</ul></li>
+<li><a href="#why-not-just-test-each-correlation-separately" id="toc-why-not-just-test-each-correlation-separately"><span class="toc-section-number">4</span> Why not just test each correlation
+separately?</a></li>
+<li><a href="#references" id="toc-references"><span class="toc-section-number">5</span> References</a></li>
+</ul>
+</div>
+
+<blockquote>
+<p><strong>How to use this document.</strong> Every code block below can
+be pasted into an R session and run in order. To keep the vignette light
+(and fast to check on CRAN) the chunks are <em>not</em> executed while
+knitting (<code>eval = FALSE</code> in the setup chunk); instead the
+expected results are reported and discussed in the text and tables. To
+run the analysis live, change <code>eval = FALSE</code> to
+<code>eval = TRUE</code>, or simply copy each block into R.</p>
+</blockquote>
+<p><em>This vignette is based on Section 4.2 of Mulder, J., &amp; Pfadt,
+J. M. (2026), “Going in the right direction: A tutorial to directional
+hypothesis testing using the BFpack module in JASP,” Advances in Methods
+and Practices in Psychological Science. The empirical case uses the
+verbal-memory data of Ichinose et al. (2019), distributed as the
+<code>memory</code> data set in <code>BFpack</code>.</em></p>
+<hr />
+<div id="introduction-and-learning-objectives" class="section level1" number="1">
+<h1><span class="header-section-number">1</span> Introduction and
+learning objectives</h1>
+<p>Many correlational questions are <strong>directional and
+joint</strong>: theory predicts not that a single association differs
+between two groups, but that a <em>whole set</em> of associations is
+uniformly stronger in one group than in another. The standard workflow
+answers such a question indirectly — one correlation-difference test per
+pair, followed by a multiplicity correction — and then asks the reader
+to reassemble the pieces. This tutorial shows a direct alternative:
+<strong>testing the single joint directional hypothesis with a Bayes
+factor</strong> using <code>BFpack</code>.</p>
+<div id="the-running-example" class="section level2" number="1.1">
+<h2><span class="header-section-number">1.1</span> The running
+example</h2>
+<p>The concept of schizophrenia as a disorder of abnormal neural
+coordination — “dysconnectivity” — predicts that communication between
+brain regions is disrupted, which should have measurable behavioural
+consequences: the associations among cognitive-performance measures that
+are typically strong in healthy individuals should be
+<strong>weaker</strong> in patients. Ichinose et al. (2019) provide a
+data set to examine this. Twenty individuals diagnosed with
+schizophrenia (<strong>SZ</strong>) and twenty healthy controls
+(<strong>HC</strong>) each completed six assessments of verbal / working
+memory. This yields <span class="math inline">\(\binom{6}{2} =
+15\)</span> pairwise correlations per group.</p>
+<p>The substantive expectation is that <strong>every</strong> one of the
+15 correlations is larger in the HC group than in the SZ group. We test
+it as a competition between three hypotheses:</p>
+<p><span class="math display">\[
+\begin{aligned}
+{H}_1 &amp;:\ \rho_{\text{HC},pq} &gt; \rho_{\text{SZ},pq}
+   \quad\text{for all } 1\le p&lt;q\le 6 \quad(\text{directional}),\\
+{H}_2 &amp;:\ \rho_{\text{HC},pq} = \rho_{\text{SZ},pq}
+   \quad\text{for all } 1\le p&lt;q\le 6 \quad(\text{equality}),\\
+{H}_3 &amp;:\ \text{complement (neither }{H}_1\text{ nor }{H}_2\text{).}
+\end{aligned}
+\]</span></p>
+</div>
+<div id="what-you-will-be-able-to-do" class="section level2" number="1.2">
+<h2><span class="header-section-number">1.2</span> What you will be able
+to do</h2>
+<p>By the end you will be able to:</p>
+<ul>
+<li>estimate correlation matrices for two independent groups with
+<code>cor_test()</code>;</li>
+<li>read the exact correlation parameter names with
+<code>get_estimates()</code>;</li>
+<li>encode a 15-constraint directional expectation as a
+<code>BFpack</code> hypothesis string using <code>&gt;</code>,
+<code>=</code>, and <code>&amp;</code>;</li>
+<li>compute Bayes factors and posterior probabilities with
+<code>BF()</code> and interpret them; and</li>
+<li>see why the equivalent <em>classical</em> route — 15 Fisher <span class="math inline">\(r\)</span>-to-<span class="math inline">\(z\)</span> tests with a multiplicity correction —
+gives only fragmented, lower-powered evidence.</li>
+</ul>
+<hr />
+</div>
+</div>
+<div id="setup-packages-seed-and-data" class="section level1" number="2">
+<h1><span class="header-section-number">2</span> Setup: packages, seed,
+and data</h1>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># install.packages(&quot;BFpack&quot;)   # once, if needed (correlation tests need v0.3+)</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&quot;BFpack&quot;</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">1</span>)   <span class="co"># cor_test() uses MCMC; fix the seed for reproducibility.</span></span></code></pre></div>
+<p>The <code>memory</code> data set ships with <code>BFpack</code>. It
+contains the six memory measures (<code>Im</code>, <code>Del</code>,
+<code>Wmn</code>, <code>Cat</code>, <code>Fas</code>, <code>Rat</code>)
+in the first six columns and a <code>Group</code> indicator
+(<code>HC</code> / <code>SZ</code>) in the last column. We split it into
+the two groups, dropping the grouping column:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>memoryHC <span class="ot">&lt;-</span> <span class="fu">subset</span>(memory, Group <span class="sc">==</span> <span class="st">&quot;HC&quot;</span>)[, <span class="sc">-</span><span class="dv">7</span>]   <span class="co"># 20 healthy controls</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>memorySZ <span class="ot">&lt;-</span> <span class="fu">subset</span>(memory, Group <span class="sc">==</span> <span class="st">&quot;SZ&quot;</span>)[, <span class="sc">-</span><span class="dv">7</span>]   <span class="co"># 20 patients (schizophrenia)</span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">colnames</span>(memoryHC)   <span class="co">#&gt; &quot;Im&quot; &quot;Del&quot; &quot;Wmn&quot; &quot;Cat&quot; &quot;Fas&quot; &quot;Rat&quot;</span></span></code></pre></div>
+<blockquote>
+<p><strong>Measurement levels and the type of correlation.</strong>
+<code>cor_test()</code> chooses the appropriate correlation
+automatically from each variable’s measurement level: a product-moment
+correlation between two continuous variables, or a polyserial
+correlation when one variable is ordinal. If a variable such as
+<code>Rat</code> should be treated as continuous rather than ordinal,
+set its class accordingly (e.g.
+<code>memoryHC$Rat &lt;- as.numeric(memoryHC$Rat)</code>) before calling
+<code>cor_test()</code>.</p>
+</blockquote>
+<hr />
+</div>
+<div id="the-joint-directional-test-in-bfpack" class="section level1" number="3">
+<h1><span class="header-section-number">3</span> The joint directional
+test in BFpack</h1>
+<div id="step-1-estimate-the-correlations-per-group" class="section level2" number="3.1">
+<h2><span class="header-section-number">3.1</span> Step 1 — Estimate the
+correlations per group</h2>
+<p><code>cor_test()</code> performs Bayesian estimation of the
+correlation matrices. Passing two data frames fits the two groups
+jointly. The <strong>order matters</strong>: the first argument becomes
+group <code>g1</code> and the second <code>g2</code>. We put HC first,
+so <code>g1 = HC</code> and <code>g2 = SZ</code>.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>cor6 <span class="ot">&lt;-</span> <span class="fu">cor_test</span>(memoryHC, memorySZ)</span></code></pre></div>
+<p>A joint uniform prior is placed over all admissible correlation
+matrices: every combination of correlations that yields a
+positive-definite matrix is equally likely a priori. This proper,
+“neutral” default is what makes the Bayes factor well defined for
+correlations without any manual prior tuning.</p>
+</div>
+<div id="step-2-read-the-exact-parameter-names" class="section level2" number="3.2">
+<h2><span class="header-section-number">3.2</span> Step 2 — Read the
+exact parameter names</h2>
+<p><strong>This step is essential.</strong> The names used in a
+hypothesis string are exactly the names printed by
+<code>get_estimates()</code>. They are built as
+<code>[var]_with_[var]_in_[group]</code>, so the HC / SZ correlation
+between <code>Del</code> and <code>Im</code> appears as
+<code>Del_with_Im_in_g1</code> and <code>Del_with_Im_in_g2</code>.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">get_estimates</span>(cor6)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="co">#&gt; Correlation names include, among others:</span></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co">#&gt;   Del_with_Im_in_g1,  Del_with_Im_in_g2,</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co">#&gt;   Del_with_Wmn_in_g1, Del_with_Wmn_in_g2,  ...  (30 in total: 15 per group)</span></span></code></pre></div>
+</div>
+<div id="step-3-formulate-the-hypotheses" class="section level2" number="3.3">
+<h2><span class="header-section-number">3.3</span> Step 3 — Formulate
+the hypotheses</h2>
+<p><span class="math inline">\({H}_1\)</span> is written as 15 one-sided
+constraints joined by <code>&amp;</code>; <span class="math inline">\({H}_2\)</span> as the matching 15 equality
+constraints. The two are separated by a semicolon. We do
+<strong>not</strong> write <span class="math inline">\({H}_3\)</span>
+explicitly: <code>BF()</code> adds the complement automatically.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>constraints_full <span class="ot">&lt;-</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a> <span class="st">&quot;Del_with_Im_in_g1  &gt; Del_with_Im_in_g2  &amp;</span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="st">  Del_with_Wmn_in_g1 &gt; Del_with_Wmn_in_g2 &amp;</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="st">  Del_with_Cat_in_g1 &gt; Del_with_Cat_in_g2 &amp;</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="st">  Del_with_Fas_in_g1 &gt; Del_with_Fas_in_g2 &amp;</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="st">  Del_with_Rat_in_g1 &gt; Del_with_Rat_in_g2 &amp;</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="st">  Im_with_Wmn_in_g1  &gt; Im_with_Wmn_in_g2  &amp;</span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="st">  Im_with_Cat_in_g1  &gt; Im_with_Cat_in_g2  &amp;</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="st">  Im_with_Fas_in_g1  &gt; Im_with_Fas_in_g2  &amp;</span></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="st">  Im_with_Rat_in_g1  &gt; Im_with_Rat_in_g2  &amp;</span></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="st">  Wmn_with_Cat_in_g1 &gt; Wmn_with_Cat_in_g2 &amp;</span></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="st">  Wmn_with_Fas_in_g1 &gt; Wmn_with_Fas_in_g2 &amp;</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="st">  Wmn_with_Rat_in_g1 &gt; Wmn_with_Rat_in_g2 &amp;</span></span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="st">  Cat_with_Fas_in_g1 &gt; Cat_with_Fas_in_g2 &amp;</span></span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="st">  Cat_with_Rat_in_g1 &gt; Cat_with_Rat_in_g2 &amp;</span></span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="st">  Fas_with_Rat_in_g1 &gt; Fas_with_Rat_in_g2;</span></span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="st">  Del_with_Im_in_g1  = Del_with_Im_in_g2  &amp;</span></span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="st">  Del_with_Wmn_in_g1 = Del_with_Wmn_in_g2 &amp;</span></span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="st">  Del_with_Cat_in_g1 = Del_with_Cat_in_g2 &amp;</span></span>
+<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a><span class="st">  Del_with_Fas_in_g1 = Del_with_Fas_in_g2 &amp;</span></span>
+<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a><span class="st">  Del_with_Rat_in_g1 = Del_with_Rat_in_g2 &amp;</span></span>
+<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a><span class="st">  Im_with_Wmn_in_g1  = Im_with_Wmn_in_g2  &amp;</span></span>
+<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="st">  Im_with_Cat_in_g1  = Im_with_Cat_in_g2  &amp;</span></span>
+<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a><span class="st">  Im_with_Fas_in_g1  = Im_with_Fas_in_g2  &amp;</span></span>
+<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a><span class="st">  Im_with_Rat_in_g1  = Im_with_Rat_in_g2  &amp;</span></span>
+<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a><span class="st">  Wmn_with_Cat_in_g1 = Wmn_with_Cat_in_g2 &amp;</span></span>
+<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a><span class="st">  Wmn_with_Fas_in_g1 = Wmn_with_Fas_in_g2 &amp;</span></span>
+<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a><span class="st">  Wmn_with_Rat_in_g1 = Wmn_with_Rat_in_g2 &amp;</span></span>
+<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a><span class="st">  Cat_with_Fas_in_g1 = Cat_with_Fas_in_g2 &amp;</span></span>
+<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a><span class="st">  Cat_with_Rat_in_g1 = Cat_with_Rat_in_g2 &amp;</span></span>
+<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a><span class="st">  Fas_with_Rat_in_g1 = Fas_with_Rat_in_g2&quot;</span></span></code></pre></div>
+</div>
+<div id="step-4-compute-the-bayes-factors" class="section level2" number="3.4">
+<h2><span class="header-section-number">3.4</span> Step 4 — Compute the
+Bayes factors</h2>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>BF_full <span class="ot">&lt;-</span> <span class="fu">BF</span>(cor6, <span class="at">hypothesis =</span> constraints_full)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">print</span>(BF_full)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="fu">summary</span>(BF_full)</span></code></pre></div>
+<p>By default the three hypotheses receive equal prior probabilities of
+<span class="math inline">\(1/3\)</span>. To weight them differently,
+pass <code>prior.hyp.conf</code> (one weight per hypothesis, in order,
+including the complement) — this shifts the posterior probabilities but
+leaves the Bayes factors, which measure the evidence <em>in the
+data</em>, unchanged.</p>
+</div>
+<div id="results" class="section level2" number="3.5">
+<h2><span class="header-section-number">3.5</span> Results</h2>
+<p><strong>Table 1. Bayes factors and posterior probabilities for the
+three hypotheses (equal prior probabilities).</strong></p>
+<table>
+<colgroup>
+<col width="15%" />
+<col width="21%" />
+<col width="21%" />
+<col width="21%" />
+<col width="21%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Hypothesis</th>
+<th align="right">vs <span class="math inline">\({H}_1\)</span></th>
+<th align="right">vs <span class="math inline">\({H}_2\)</span></th>
+<th align="right">vs <span class="math inline">\({H}_3\)</span></th>
+<th align="right"><span class="math inline">\(P({H}_t\mid\text{Data})\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong><span class="math inline">\({H}_1\)</span>:</strong> all
+<span class="math inline">\(\rho_{\text{HC},pq} &gt;
+\rho_{\text{SZ},pq}\)</span></td>
+<td align="right">1.000</td>
+<td align="right"><span class="math inline">\(1.149\times10^{6}\)</span></td>
+<td align="right">5779</td>
+<td align="right"><strong>1.000</strong></td>
+</tr>
+<tr class="even">
+<td><strong><span class="math inline">\({H}_2\)</span>:</strong> all
+<span class="math inline">\(\rho_{\text{HC},pq} =
+\rho_{\text{SZ},pq}\)</span></td>
+<td align="right"><span class="math inline">\(8.70\times10^{-7}\)</span></td>
+<td align="right">1.000</td>
+<td align="right">0.005</td>
+<td align="right"><span class="math inline">\(\approx 0\)</span></td>
+</tr>
+<tr class="odd">
+<td><strong><span class="math inline">\({H}_3\)</span>:</strong>
+complement</td>
+<td align="right"><span class="math inline">\(1.73\times10^{-4}\)</span></td>
+<td align="right">198.9</td>
+<td align="right">1.000</td>
+<td align="right"><span class="math inline">\(\approx 0\)</span></td>
+</tr>
+</tbody>
+</table>
+<p>The joint one-sided hypothesis <span class="math inline">\({H}_1\)</span> is favoured over the equality
+hypothesis by a Bayes factor of about <span class="math inline">\(1.1\times10^{6}\)</span> and over the complement
+by about <span class="math inline">\(5.8\times10^{3}\)</span>. With
+equal priors this maps to a posterior probability of essentially 1 for
+<span class="math inline">\({H}_1\)</span>. A possible write-up:</p>
+<blockquote>
+<p>“The joint one-sided hypothesis <span class="math inline">\({H}_1\)</span> received overwhelming evidence
+against its equality-constrained alternative <span class="math inline">\({H}_2\)</span> and the complement <span class="math inline">\({H}_3\)</span>, with Bayes factors of <span class="math inline">\(1.1\times10^{6}\)</span> and <span class="math inline">\(5.8\times10^{3}\)</span>, respectively (equal
+prior probabilities; posterior probabilities 1.000, 0.000, 0.000). There
+is thus overwhelming evidence that the correlational structure among the
+memory measures is stronger in the healthy-control group than in the
+schizophrenia group across all pairs of variables.”</p>
+</blockquote>
+<p>Note how a <em>single</em> number expresses support for the whole
+predicted pattern — exactly what the substantive theory claims, and
+exactly what a collection of separate tests cannot deliver.</p>
+<hr />
+</div>
+</div>
+<div id="why-not-just-test-each-correlation-separately" class="section level1" number="4">
+<h1><span class="header-section-number">4</span> Why not just test each
+correlation separately?</h1>
+<p>The classical route tests each of the 15 correlation differences on
+its own with Fisher’s <span class="math inline">\(r\)</span>-to-<span class="math inline">\(z\)</span> transformation, then corrects for
+multiplicity. With 15 tests at <span class="math inline">\(\alpha =
+.05\)</span> the probability of at least one false positive under the
+global null is <span class="math inline">\(1 - (1-.05)^{15} \approx
+.54\)</span>, which forces a correction — and the correction further
+drains power from an already small sample (<span class="math inline">\(n
+= 20\)</span> per group).</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>vars  <span class="ot">&lt;-</span> <span class="fu">colnames</span>(memoryHC)</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>n1    <span class="ot">&lt;-</span> <span class="fu">nrow</span>(memoryHC)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>n2    <span class="ot">&lt;-</span> <span class="fu">nrow</span>(memorySZ)</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>pairs <span class="ot">&lt;-</span> <span class="fu">combn</span>(vars, <span class="dv">2</span>, <span class="at">simplify =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="co"># Fisher r-to-z comparison of two independent correlations.</span></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>compare_corrs <span class="ot">&lt;-</span> <span class="cf">function</span>(x1, x2, y1, y2, n1, n2) {</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>  r1 <span class="ot">&lt;-</span> <span class="fu">cor</span>(x1, y1, <span class="at">use =</span> <span class="st">&quot;pairwise.complete.obs&quot;</span>)</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>  r2 <span class="ot">&lt;-</span> <span class="fu">cor</span>(x2, y2, <span class="at">use =</span> <span class="st">&quot;pairwise.complete.obs&quot;</span>)</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>  z1 <span class="ot">&lt;-</span> <span class="fu">atanh</span>(r1); z2 <span class="ot">&lt;-</span> <span class="fu">atanh</span>(r2)</span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>  se <span class="ot">&lt;-</span> <span class="fu">sqrt</span>(<span class="dv">1</span> <span class="sc">/</span> (n1 <span class="sc">-</span> <span class="dv">3</span>) <span class="sc">+</span> <span class="dv">1</span> <span class="sc">/</span> (n2 <span class="sc">-</span> <span class="dv">3</span>))</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>  zstat <span class="ot">&lt;-</span> (z1 <span class="sc">-</span> z2) <span class="sc">/</span> se</span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>  <span class="fu">data.frame</span>(<span class="at">r_HC =</span> r1, <span class="at">r_SZ =</span> r2, <span class="at">z =</span> zstat,</span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>             <span class="at">p_equal        =</span> <span class="dv">2</span> <span class="sc">*</span> <span class="fu">pnorm</span>(<span class="fu">abs</span>(zstat), <span class="at">lower.tail =</span> <span class="cn">FALSE</span>),</span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>             <span class="at">p_HC_greater   =</span> <span class="fu">pnorm</span>(zstat, <span class="at">lower.tail =</span> <span class="cn">FALSE</span>))</span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a>}</span>
+<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a></span>
+<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a>results <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind, <span class="fu">lapply</span>(pairs, <span class="cf">function</span>(pr) {</span>
+<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a>  res <span class="ot">&lt;-</span> <span class="fu">compare_corrs</span>(memoryHC[[pr[<span class="dv">1</span>]]], memorySZ[[pr[<span class="dv">1</span>]]],</span>
+<span id="cb7-20"><a href="#cb7-20" tabindex="-1"></a>                       memoryHC[[pr[<span class="dv">2</span>]]], memorySZ[[pr[<span class="dv">2</span>]]], n1, n2)</span>
+<span id="cb7-21"><a href="#cb7-21" tabindex="-1"></a>  res<span class="sc">$</span>pair <span class="ot">&lt;-</span> <span class="fu">paste0</span>(pr[<span class="dv">1</span>], <span class="st">&quot;_with_&quot;</span>, pr[<span class="dv">2</span>]); res</span>
+<span id="cb7-22"><a href="#cb7-22" tabindex="-1"></a>}))</span>
+<span id="cb7-23"><a href="#cb7-23" tabindex="-1"></a></span>
+<span id="cb7-24"><a href="#cb7-24" tabindex="-1"></a><span class="co"># Holm correction across the 15 one-sided tests.</span></span>
+<span id="cb7-25"><a href="#cb7-25" tabindex="-1"></a>results<span class="sc">$</span>p_HC_greater_holm <span class="ot">&lt;-</span> <span class="fu">p.adjust</span>(results<span class="sc">$</span>p_HC_greater, <span class="at">method =</span> <span class="st">&quot;holm&quot;</span>)</span>
+<span id="cb7-26"><a href="#cb7-26" tabindex="-1"></a>results <span class="ot">&lt;-</span> results[<span class="fu">order</span>(results<span class="sc">$</span>pair), ]</span>
+<span id="cb7-27"><a href="#cb7-27" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">cbind</span>(results<span class="sc">$</span>pair, <span class="fu">round</span>(results[, <span class="fu">c</span>(<span class="st">&quot;r_HC&quot;</span>,<span class="st">&quot;r_SZ&quot;</span>,<span class="st">&quot;z&quot;</span>,</span>
+<span id="cb7-28"><a href="#cb7-28" tabindex="-1"></a>      <span class="st">&quot;p_equal&quot;</span>,<span class="st">&quot;p_HC_greater&quot;</span>,<span class="st">&quot;p_HC_greater_holm&quot;</span>)], <span class="dv">3</span>)), <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code></pre></div>
+<p><strong>Table 2. Classical post-hoc comparisons (Fisher <span class="math inline">\(r\)</span>-to-<span class="math inline">\(z\)</span>, Holm-adjusted).</strong></p>
+<table>
+<colgroup>
+<col width="11%" />
+<col width="14%" />
+<col width="14%" />
+<col width="14%" />
+<col width="14%" />
+<col width="14%" />
+<col width="14%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pair</th>
+<th align="right"><span class="math inline">\(r_{\text{HC}}\)</span></th>
+<th align="right"><span class="math inline">\(r_{\text{SZ}}\)</span></th>
+<th align="right"><span class="math inline">\(z\)</span></th>
+<th align="right"><span class="math inline">\(p_{\text{equal}}\)</span></th>
+<th align="right"><span class="math inline">\(p_{\text{HC}&gt;\text{SZ}}\)</span></th>
+<th align="right">Adj. <span class="math inline">\(p_{\text{HC}&gt;\text{SZ}}\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Cat–Fas</td>
+<td align="right">0.734</td>
+<td align="right">0.219</td>
+<td align="right">2.08</td>
+<td align="right">0.037</td>
+<td align="right">0.019</td>
+<td align="right">0.119</td>
+</tr>
+<tr class="even">
+<td>Cat–Rat</td>
+<td align="right">0.769</td>
+<td align="right">−0.251</td>
+<td align="right">3.71</td>
+<td align="right">&lt;0.001</td>
+<td align="right">&lt;0.001</td>
+<td align="right">0.002</td>
+</tr>
+<tr class="odd">
+<td>Del–Cat</td>
+<td align="right">0.395</td>
+<td align="right">0.164</td>
+<td align="right">0.74</td>
+<td align="right">0.461</td>
+<td align="right">0.231</td>
+<td align="right">0.461</td>
+</tr>
+<tr class="even">
+<td>Del–Fas</td>
+<td align="right">0.322</td>
+<td align="right">0.269</td>
+<td align="right">0.17</td>
+<td align="right">0.866</td>
+<td align="right">0.433</td>
+<td align="right">0.461</td>
+</tr>
+<tr class="odd">
+<td>Del–Rat</td>
+<td align="right">0.466</td>
+<td align="right">0.088</td>
+<td align="right">1.21</td>
+<td align="right">0.225</td>
+<td align="right">0.112</td>
+<td align="right">0.337</td>
+</tr>
+<tr class="even">
+<td>Del–Wmn</td>
+<td align="right">0.499</td>
+<td align="right">−0.223</td>
+<td align="right">2.26</td>
+<td align="right">0.024</td>
+<td align="right">0.012</td>
+<td align="right">0.095</td>
+</tr>
+<tr class="odd">
+<td>Fas–Rat</td>
+<td align="right">0.673</td>
+<td align="right">−0.144</td>
+<td align="right">2.80</td>
+<td align="right">0.005</td>
+<td align="right">0.003</td>
+<td align="right">0.033</td>
+</tr>
+<tr class="even">
+<td>Im–Cat</td>
+<td align="right">0.563</td>
+<td align="right">−0.280</td>
+<td align="right">2.70</td>
+<td align="right">0.007</td>
+<td align="right">0.003</td>
+<td align="right">0.042</td>
+</tr>
+<tr class="odd">
+<td>Im–Del</td>
+<td align="right">0.833</td>
+<td align="right">0.346</td>
+<td align="right">2.44</td>
+<td align="right">0.015</td>
+<td align="right">0.007</td>
+<td align="right">0.069</td>
+</tr>
+<tr class="even">
+<td>Im–Fas</td>
+<td align="right">0.388</td>
+<td align="right">−0.173</td>
+<td align="right">1.70</td>
+<td align="right">0.089</td>
+<td align="right">0.044</td>
+<td align="right">0.222</td>
+</tr>
+<tr class="odd">
+<td>Im–Rat</td>
+<td align="right">0.544</td>
+<td align="right">0.078</td>
+<td align="right">1.55</td>
+<td align="right">0.121</td>
+<td align="right">0.061</td>
+<td align="right">0.243</td>
+</tr>
+<tr class="even">
+<td>Im–Wmn</td>
+<td align="right">0.654</td>
+<td align="right">−0.066</td>
+<td align="right">2.47</td>
+<td align="right">0.013</td>
+<td align="right">0.007</td>
+<td align="right">0.069</td>
+</tr>
+<tr class="odd">
+<td>Wmn–Cat</td>
+<td align="right">0.773</td>
+<td align="right">−0.053</td>
+<td align="right">3.15</td>
+<td align="right">0.002</td>
+<td align="right">0.001</td>
+<td align="right">0.011</td>
+</tr>
+<tr class="even">
+<td>Wmn–Fas</td>
+<td align="right">0.700</td>
+<td align="right">0.010</td>
+<td align="right">2.50</td>
+<td align="right">0.012</td>
+<td align="right">0.006</td>
+<td align="right">0.069</td>
+</tr>
+<tr class="odd">
+<td>Wmn–Rat</td>
+<td align="right">0.611</td>
+<td align="right">−0.016</td>
+<td align="right">2.12</td>
+<td align="right">0.034</td>
+<td align="right">0.017</td>
+<td align="right">0.119</td>
+</tr>
+</tbody>
+</table>
+<p>Every correlation is numerically larger in HC than in SZ — perfectly
+consistent with the directional expectation — yet after Holm correction
+only a handful of the 15 comparisons remain significant. This is the
+familiar bind:</p>
+<ul>
+<li><strong>Multiplicity and power.</strong> Guarding 15 tests against
+false positives requires a correction that removes exactly the power a
+20-per-group study can least afford, so genuinely uniform effects fail
+to reach significance one by one.</li>
+<li><strong>No single statement.</strong> The output is a scatter of 15
+<span class="math inline">\(p\)</span>-values, not an answer to the
+actual question (“is the whole pattern stronger in HC?”). Reassembling
+them into support for the theory is subjective and invites selective
+emphasis on the significant rows.</li>
+</ul>
+<p>The joint Bayes-factor test in the previous section sidesteps both
+problems: it <strong>aggregates</strong> the mild-to-moderate evidence
+in each pair into one very large evidential statement, with no
+multiplicity correction, because it is a single test of a single
+hypothesis.</p>
+<hr />
+</div>
+<div id="references" class="section level1" number="5">
+<h1><span class="header-section-number">5</span> References</h1>
+<p>Ichinose, M. C., Han, G., Polyn, S., Park, S., &amp; Tomarken, A. J.
+(2019). Verbal memory performance discordance in schizophrenia: A
+reflection of cognitive dysconnectivity? <em>(Data distributed as the
+<code>memory</code> set in <code>BFpack</code>.)</em></p>
+<p>Mulder, J. (2016). Bayes factors for testing order-constrained
+hypotheses on correlations. <em>Journal of Mathematical
+Psychology.</em></p>
+<p>Mulder, J., &amp; Gelissen, J. P. (2019). Bayes factor testing of
+equality and order constraints on measures of association in social
+research. <em>Journal of Applied Statistics.</em> <a href="https://doi.org/10.1080/02664763.2021.1992360" class="uri">https://doi.org/10.1080/02664763.2021.1992360</a></p>
+<p>Mulder, J., &amp; Pfadt, J. M. (2026). Going in the right direction:
+A tutorial to directional hypothesis testing using the BFpack module in
+JASP. <em>Advances in Methods and Practices in Psychological
+Science.</em></p>
+<p>Mulder, J., et al. (2021). BFpack: Flexible Bayes factor testing of
+scientific expectations in R. <em>Journal of Statistical Software,
+100</em>(18), 1–63.</p>
+<hr />
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
