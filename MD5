@@ -1,4 +1,4 @@
-8235745069bd956c465809d3dd1ca2d0 *DESCRIPTION
+a6fb615964f676c09a74c7b8e3035790 *DESCRIPTION
 7e4281769accfdb0df5c847e9435f55b *NAMESPACE
 2a802d094c2ccb78e63e1ad787492711 *NEWS.md
 efc60c788e91632bb3b9d63fab9dc5da *R/BF.coeftest.R
@@ -58,16 +58,16 @@ b93799eddf2ecc337f291d8ac4bcdfa6 *data/wilson.rda
 0245626112e5f0a5a650aad1324ab1b9 *inst/CITATION
 73d74c16d928895daf5cfaee81f8cc67 *inst/doc/vignette_BFpack_correlation.R
 9e4dc8cf8b912d859272c8e44f6f9593 *inst/doc/vignette_BFpack_correlation.Rmd
-ab58bd7450b5ca689b9b67382de5f369 *inst/doc/vignette_BFpack_correlation.html
+8b0a76ff0d33e9f8e2c3fafabd88e4f1 *inst/doc/vignette_BFpack_correlation.html
 3e8e069903b4f300927a43e1c96953e3 *inst/doc/vignette_BFpack_ergm.R
 4010fba25d28b04fab966c39aedde331 *inst/doc/vignette_BFpack_ergm.Rmd
-4d6fddae845de1fa9f9eac0ea022cfda *inst/doc/vignette_BFpack_ergm.html
+ad153e2d2999f31568798c65cef5f0ea *inst/doc/vignette_BFpack_ergm.html
 4b73eb641175b24140225b50974d32e2 *inst/doc/vignette_BFpack_general.R
 45c03dd8a4a289b667c5fb798ba34cac *inst/doc/vignette_BFpack_general.Rmd
-fe368d78fbcf27b1b6b02f9a4d89b9e2 *inst/doc/vignette_BFpack_general.html
+ec09d0987e1381171e63c822d473b133 *inst/doc/vignette_BFpack_general.html
 8c7aa5c19d5cbb1ad7c38a279abb7b97 *inst/doc/vignette_BFpack_regression.R
 55ac811292f7d027ea5b6ee0f446fab3 *inst/doc/vignette_BFpack_regression.Rmd
-5059a2f1ccc6e847859b5a43b6aa2851 *inst/doc/vignette_BFpack_regression.html
+6894f70bc9ab7185e5b897ba741c5516 *inst/doc/vignette_BFpack_regression.html
 27b049d9de8ee7cc6b52aad125b8d960 *man/BF.Rd
 3d49d2d8fb11c5ed1ddf313a35fb1a5f *man/BFpack-package.Rd
 23ceeebb80394c14ce36d37361f793a5 *man/Fcor.Rd
@@ -90,8 +90,8 @@ fba1b72f4e23fa4245cbacb828214999 *man/attention.Rd
 9c99132a39f97ca5404324506839ff57 *man/wilson.Rd
 664dfbf737b6b6b29b8b1644095f4d00 *src/BFpack_init.c
 d83dfdd5689fe5054bdba467a8239193 *src/Makevars
-53ca2e44734d8d181e922d27b106bdfa *src/bct_mixedordinal.f90
-be46a3676b115c169c811e9962e54c25 *src/bct_prior.f90
+befc55ebedc3d534c5dc40c7ad4638e7 *src/bct_mixedordinal.f90
+7b54ad3051c74c95d7fd3b57b856fbac *src/bct_prior.f90
 2ca12c3758109fb3ac11cb5a3764819f *tests/testthat.R
 77666856109e2d76ad82671047a8d8fb *tests/testthat/test_BFcoeftest.R
 fb370f19cf58d0914fcd4245f10e96b7 *tests/testthat/test_BFcortest.R
